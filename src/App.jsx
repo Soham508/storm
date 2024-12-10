@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Stage, Layer, Rect, Arrow, Ellipse } from "react-konva";
+import { Stage, Layer, Rect, Arrow, Ellipse, Circle } from "react-konva";
 import { nanoid } from "nanoid";
 
 const App = () => {
   const [shapes, setShapes] = useState([{}]);
   const [tool, setTool] = useState("rectangle"); // Tool selection: 'rectangle', 'circle', 'line', 'freehand'
   const [isDrawing, setIsDrawing] = useState(false);
+  const [selectedShape, setSelectedShape] = useState(undefined);
   const [currentLine, setCurrentLine] = useState([]);
   const [dragState, setDragState] = useState({
     dragging: false,
@@ -14,23 +15,77 @@ const App = () => {
   const [startPosition, setStartPosition] = useState(undefined);
 
   useEffect(() => {
-    console.log(shapes);
-  }, [shapes, startPosition]);
+    console.log(selectedShape);
+
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.key === "f") {
+        e.preventDefault();
+        setTool("freehand");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedShape]);
+
+  const handleStageClick = () => {
+    if (tool === "freehand") {
+      setSelectedShape(null);
+    }
+  };
+
+  const handleShapeClick = (e, shape) => {
+    if (tool === "freehand") {
+      e.cancelBubble = true; // Prevent event from propagating to the Stage
+      setSelectedShape(shape);
+    }
+  };
 
   const handleDragStart = (e) => {
     const id = e.target.id();
     setDragState({ dragging: true, id: id });
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (e) => {
+    const id = e.target.id();
+    const { x, y } = e.target.position();
+
+    if (e.target.name() === "line") {
+      const points = e.target.points();
+      console.log(points);
+      setShapes((prev) =>
+        prev.map((shape) => (shape.id === id ? { ...shape, points } : shape))
+      );
+    } else {
+      setShapes((prev) =>
+        prev.map((shape) => (shape.id === id ? { ...shape, x, y } : shape))
+      );
+    }
+    const shape = shapes.filter((shape) => shape.id == id);
+    setSelectedShape(shape);
     setDragState({ dragging: false, id: undefined });
+  };
+
+  const handleMouseEnter = () => {
+    if (tool === "freehand") {
+      document.body.style.cursor = "pointer";
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (tool === "freehand") {
+      document.body.style.cursor = "default";
+    }
   };
 
   const handleMouseDown = (e) => {
     const { x, y } = e.target.getStage().getPointerPosition();
 
     switch (tool) {
-      case "freehand":
+      case "drawing":
         setIsDrawing(true);
         setCurrentLine([x, y]);
         break;
@@ -49,7 +104,7 @@ const App = () => {
     const { x, y } = e.target.getStage().getPointerPosition();
 
     switch (tool) {
-      case "freehand":
+      case "drawing":
         if (isDrawing) {
           setCurrentLine((prevLine) => [...prevLine, x, y]);
 
@@ -208,7 +263,7 @@ const App = () => {
     const { x, y } = e.target.getStage().getPointerPosition();
 
     switch (tool) {
-      case "freehand":
+      case "drawing":
         if (isDrawing) {
           setShapes((prevShapes) => [
             ...prevShapes.slice(0, prevShapes.length - 1),
@@ -288,23 +343,341 @@ const App = () => {
     }
   };
 
-  const addShape = (e) => {
-    const { x, y } = e.target.getStage().getPointerPosition();
+  const renderSelectionBox = () => {
+    if (!selectedShape) return null;
 
-    if (tool !== "freehand") {
-      setShapes((prevShapes) => [
-        ...prevShapes,
-        {
-          id: nanoid(),
-          type: tool,
-          x: x,
-          y: y,
-          width: 100,
-          height: 100,
-          radius: 50,
-        },
-      ]);
+    const { x, y, width, height, type, points, radiusX, radiusY } =
+      selectedShape;
+
+    if (type === "rectangle") {
+      const marginx = 5;
+      const marginy = 5;
+      return (
+        <>
+          {/* Dashed Selection Box */}
+          <Rect
+            x={x - marginx}
+            y={y - marginy}
+            width={width + marginx * 2}
+            height={height + marginy * 2}
+            stroke="red"
+            strokeWidth={1}
+            dash={[5, 5]}
+          />
+          {/* Resize Handles (Red Dots at Corners) */}
+          <Circle
+            x={x}
+            y={y}
+            radius={7}
+            onDragMove={(e) => {
+              const { x: newX, y: newY } = e.target.position();
+              const {
+                id,
+                x: currentX,
+                y: currentY,
+                width: currentWidth,
+                height: currentHeight,
+              } = selectedShape;
+
+              const updatedX = Math.min(currentX + currentWidth, newX);
+              const updatedY = Math.min(currentY + currentHeight, newY);
+              const updatedWidth = Math.abs(newX - (currentX + currentWidth));
+              const updatedHeight = Math.abs(newY - (currentY + currentHeight));
+
+              setShapes((prev) =>
+                prev.map((shape) =>
+                  shape.id === id
+                    ? {
+                        ...shape,
+                        x: updatedX,
+                        y: updatedY,
+                        width: updatedWidth,
+                        height: updatedHeight,
+                      }
+                    : shape
+                )
+              );
+              setSelectedShape((prev) => ({
+                ...prev,
+                x: updatedX,
+                y: updatedY,
+                width: updatedWidth,
+                height: updatedHeight,
+              }));
+            }}
+            fill="red"
+            draggable
+          />
+
+          <Circle
+            x={x + width}
+            y={y}
+            radius={7}
+            onDragMove={(e) => {
+              const { x: newX, y: newY } = e.target.position();
+              const {
+                id,
+                x: currentX,
+                y: currentY,
+                height: currentHeight,
+              } = selectedShape;
+
+              const updatedX = currentX;
+              const updatedY = Math.min(currentY + currentHeight, newY);
+              const updatedWidth = Math.abs(newX - currentX);
+              const updatedHeight = Math.abs(newY - (currentY + currentHeight));
+
+              setShapes((prev) =>
+                prev.map((shape) =>
+                  shape.id === id
+                    ? {
+                        ...shape,
+                        x: updatedX,
+                        y: updatedY,
+                        width: updatedWidth,
+                        height: updatedHeight,
+                      }
+                    : shape
+                )
+              );
+              setSelectedShape((prev) => ({
+                ...prev,
+                x: updatedX,
+                y: updatedY,
+                width: updatedWidth,
+                height: updatedHeight,
+              }));
+            }}
+            fill="red"
+            draggable
+          />
+
+          <Circle
+            x={x}
+            y={y + height}
+            radius={7}
+            onDragMove={(e) => {
+              const { x: newX, y: newY } = e.target.position();
+              const {
+                id,
+                x: currentX,
+                y: currentY,
+                width: currentWidth,
+              } = selectedShape;
+
+              const updatedX = Math.min(currentX + currentWidth, newX);
+              const updatedY = currentY;
+              const updatedWidth = Math.abs(newX - (currentX + currentWidth));
+              const updatedHeight = Math.abs(newY - currentY);
+
+              setShapes((prev) =>
+                prev.map((shape) =>
+                  shape.id === id
+                    ? {
+                        ...shape,
+                        x: updatedX,
+                        y: updatedY,
+                        width: updatedWidth,
+                        height: updatedHeight,
+                      }
+                    : shape
+                )
+              );
+              setSelectedShape((prev) => ({
+                ...prev,
+                x: updatedX,
+                y: updatedY,
+                width: updatedWidth,
+                height: updatedHeight,
+              }));
+            }}
+            fill="red"
+            draggable
+          />
+
+          <Circle
+            x={x + width}
+            y={y + height}
+            radius={7}
+            onDragMove={(e) => {
+              const { x, y } = e.target.position();
+              const { id, x: X, y: Y } = selectedShape;
+              setShapes((prev) =>
+                prev.map((shape) =>
+                  shape.id === id
+                    ? {
+                        ...shape,
+                        width: Math.abs(x - X),
+                        height: Math.abs(y - Y),
+                      }
+                    : shape
+                )
+              );
+              setSelectedShape((prev) => ({
+                ...prev,
+                width: Math.abs(x - X),
+                height: Math.abs(y - Y),
+              }));
+            }}
+            fill="red"
+            draggable
+          />
+        </>
+      );
     }
+
+    if (type === "ellipse") {
+      const marginx = 2;
+      const marginy = 2;
+
+      return (
+        <>
+          {/* Dashed Selection Box */}
+          <Rect
+            x={x - radiusX - marginx}
+            y={y - radiusY - marginy}
+            width={radiusX * 2 + marginx * 2}
+            height={radiusY * 2 + marginy * 2}
+            stroke="red"
+            strokeWidth={1}
+            dash={[5, 5]}
+          />
+          {/* Resize Handles (Red Dots at Corners) */}
+          <Circle
+            x={x - radiusX - marginx}
+            y={y - radiusY - marginy}
+            radius={6}
+            onDragMove={(e) => {
+              const { x, y } = e.target.position();
+              const { id, x: centerX, y: centerY } = selectedShape;
+              setShapes((prev) =>
+                prev.map((shape) =>
+                  shape.id === id
+                    ? {
+                        ...shape,
+                        radiusX: Math.abs(x - centerX),
+                        radiusY: Math.abs(y - centerY),
+                      }
+                    : shape
+                )
+              );
+              setSelectedShape((prev) => ({
+                ...prev,
+                radiusX: Math.abs(x - centerX),
+                radiusY: Math.abs(y - centerY),
+              }));
+            }}
+            fill="red"
+            draggable
+          />
+          <Circle
+            x={x + radiusX + marginx}
+            y={y - radiusY - marginy}
+            radius={6}
+            onDragMove={(e) => {
+              const { x, y } = e.target.position();
+              const { id, x: centerX, y: centerY } = selectedShape;
+              setShapes((prev) =>
+                prev.map((shape) =>
+                  shape.id === id
+                    ? {
+                        ...shape,
+                        radiusX: Math.abs(x - centerX),
+                        radiusY: Math.abs(y - centerY),
+                      }
+                    : shape
+                )
+              );
+              setSelectedShape((prev) => ({
+                ...prev,
+                radiusX: Math.abs(x - centerX),
+                radiusY: Math.abs(y - centerY),
+              }));
+            }}
+            fill="red"
+            draggable
+          />
+          <Circle
+            x={x - radiusX - marginx}
+            y={y + radiusY + marginy}
+            radius={6}
+            onDragMove={(e) => {
+              const { x, y } = e.target.position();
+              const { id, x: centerX, y: centerY } = selectedShape;
+              setShapes((prev) =>
+                prev.map((shape) =>
+                  shape.id === id
+                    ? {
+                        ...shape,
+                        radiusX: Math.abs(x - centerX),
+                        radiusY: Math.abs(y - centerY),
+                      }
+                    : shape
+                )
+              );
+              setSelectedShape((prev) => ({
+                ...prev,
+                radiusX: Math.abs(x - centerX),
+                radiusY: Math.abs(y - centerY),
+              }));
+            }}
+            fill="red"
+            draggable
+          />
+          <Circle
+            x={x + radiusX + marginx}
+            y={y + radiusY + marginy}
+            radius={6}
+            onDragMove={(e) => {
+              const { x, y } = e.target.position();
+              const { id, x: centerX, y: centerY } = selectedShape;
+              setShapes((prev) =>
+                prev.map((shape) =>
+                  shape.id === id
+                    ? {
+                        ...shape,
+                        radiusX: Math.abs(x - centerX),
+                        radiusY: Math.abs(y - centerY),
+                      }
+                    : shape
+                )
+              );
+              setSelectedShape((prev) => ({
+                ...prev,
+                radiusX: Math.abs(x - centerX),
+                radiusY: Math.abs(y - centerY),
+              }));
+            }}
+            fill="red"
+            draggable
+          />
+        </>
+      );
+    }
+
+    if (type === "line") {
+      const [x1, y1, x2, y2] = points;
+
+      return (
+        <>
+          {/* Dashed Selection Box */}
+          <Rect
+            x={Math.min(x1, x2) - 10}
+            y={Math.min(y1, y2) - 10}
+            width={Math.abs(x2 - x1) + 20}
+            height={Math.abs(y2 - y1) + 20}
+            stroke="black"
+            strokeWidth={1}
+            dash={[5, 5]}
+          />
+          {/* End Handles (Red Dots) */}
+          <Circle x={x1} y={y1} radius={5} fill="red" draggable />
+          <Circle x={x2} y={y2} radius={5} fill="red" draggable />
+        </>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -313,9 +686,8 @@ const App = () => {
         <button onClick={() => setTool("rectangle")}>Rectangle</button>
         <button onClick={() => setTool("ellipse")}>Ellipse</button>
         <button onClick={() => setTool("line")}>Line</button>
-        <button onClick={() => setTool("freehand")}>Freehand</button>
-        <button onClick={() => setTool("")}>Free</button>
-        <button onClick={addShape}>Add Shape</button>
+        <button onClick={() => setTool("drawing")}>Draw</button>
+        <button onClick={() => setTool("freehand")}>Free</button>
       </div>
       <Stage
         width={window.innerWidth}
@@ -323,6 +695,7 @@ const App = () => {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onClick={handleStageClick}
       >
         <Layer>
           {shapes.map((shape, index) => {
@@ -331,6 +704,7 @@ const App = () => {
                 <Rect
                   key={index}
                   id={shape.id}
+                  name="rectangle"
                   x={shape.x}
                   y={shape.y}
                   width={shape.width}
@@ -351,9 +725,14 @@ const App = () => {
                   scaleY={
                     dragState.dragging && shape.id == dragState.id ? 1.05 : 1
                   }
-                  draggable
+                  draggable={tool === "freehand"}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                  onClick={(e) => {
+                    handleShapeClick(e, shape);
+                  }}
                 />
               );
             }
@@ -362,6 +741,7 @@ const App = () => {
                 <Ellipse
                   key={index}
                   id={shape.id}
+                  name="ellipse"
                   x={shape.x}
                   y={shape.y}
                   fillPatternOffset={[100, 200]}
@@ -384,9 +764,14 @@ const App = () => {
                   scaleY={
                     dragState.dragging && shape.id == dragState.id ? 1.05 : 1
                   }
-                  draggable
+                  draggable={tool === "freehand"}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                  onClick={(e) => {
+                    handleShapeClick(e, shape);
+                  }}
                 />
               );
             }
@@ -395,6 +780,7 @@ const App = () => {
                 <Arrow
                   key={index}
                   id={shape.id}
+                  name="line"
                   points={shape.points}
                   stroke={shape.color || "white"}
                   strokeWidth={3}
@@ -417,24 +803,23 @@ const App = () => {
                   scaleY={
                     dragState.dragging && shape.id == dragState.id ? 1.05 : 1
                   }
-                  draggable
+                  draggable={tool === "freehand"}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                  onClick={(e) => {
+                    console.log(e.target.attrs.points);
+                    handleShapeClick(e, shape);
+                  }}
                 />
               );
             }
             return null;
           })}
-          <Ellipse
-            x={100} // X position of the center
-            y={200} // Y position of the center
-            radiusX={100} // Horizontal radius (half the width)
-            radiusY={50} // Vertical radius (half the height)
-            fill="green" // Ellipse color
-            stroke="black" // Stroke color (border)
-            strokeWidth={4} // Stroke width (border thickness)
-            draggable={true} // Make the ellipse draggable
-          />
+
+          {renderSelectionBox()}
+          <Rect x={0} y={0} height={100} width={100} stroke="red" />
         </Layer>
       </Stage>
     </div>
