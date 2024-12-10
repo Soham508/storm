@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react";
 import { Stage, Layer, Rect, Arrow, Ellipse, Circle } from "react-konva";
 import { nanoid } from "nanoid";
+import { LiaHandPaperSolid } from "react-icons/lia";
+import { LuPenLine } from "react-icons/lu";
+import { TfiLayoutLineSolid } from "react-icons/tfi";
+import { HiOutlineArrowLongRight } from "react-icons/hi2";
+import { MdOutlineCircle } from "react-icons/md";
+import { BiRectangle } from "react-icons/bi";
+import { CiText } from "react-icons/ci";
 
 const App = () => {
   const [shapes, setShapes] = useState([{}]);
-  const [tool, setTool] = useState("rectangle"); // Tool selection: 'rectangle', 'circle', 'line', 'freehand'
+  const [tool, setTool] = useState({
+    type: "rectangle",
+    properties: { color: "white" },
+  });
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedShape, setSelectedShape] = useState(undefined);
   const [currentLine, setCurrentLine] = useState([]);
@@ -16,11 +26,12 @@ const App = () => {
 
   useEffect(() => {
     console.log(selectedShape);
+    console.log(shapes);
 
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === "f") {
         e.preventDefault();
-        setTool("freehand");
+        setTool({ type: "freehand" });
       }
     };
 
@@ -29,16 +40,40 @@ const App = () => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedShape]);
+  }, [selectedShape, shapes]);
 
-  const handleStageClick = () => {
-    if (tool === "freehand") {
-      setSelectedShape(null);
+  const handleStageClick = (e) => {
+    const stage = e.target.getStage();
+    const pointerPosition = stage.getPointerPosition();
+
+    switch (tool.type) {
+      case "freehand":
+        setSelectedShape(null);
+        break;
+
+      case "textbox":
+        setShapes([
+          ...shapes,
+          {
+            id: nanoid(),
+            type: "textbox",
+            x: pointerPosition.x,
+            y: pointerPosition.y,
+            fontFamily: "Arial",
+            fontSize: 20,
+            ...tool.properties,
+            text: "",
+          },
+        ]);
+        break;
+
+      default:
+        break;
     }
   };
 
   const handleShapeClick = (e, shape) => {
-    if (tool === "freehand") {
+    if (tool.type === "freehand") {
       e.cancelBubble = true; // Prevent event from propagating to the Stage
       setSelectedShape(shape);
     }
@@ -70,13 +105,13 @@ const App = () => {
   };
 
   const handleMouseEnter = () => {
-    if (tool === "freehand") {
+    if (tool.type === "freehand") {
       document.body.style.cursor = "pointer";
     }
   };
 
   const handleMouseLeave = () => {
-    if (tool === "freehand") {
+    if (tool.type === "freehand") {
       document.body.style.cursor = "default";
     }
   };
@@ -84,7 +119,7 @@ const App = () => {
   const handleMouseDown = (e) => {
     const { x, y } = e.target.getStage().getPointerPosition();
 
-    switch (tool) {
+    switch (tool.type) {
       case "drawing":
         setIsDrawing(true);
         setCurrentLine([x, y]);
@@ -103,7 +138,7 @@ const App = () => {
   const handleMouseMove = (e) => {
     const { x, y } = e.target.getStage().getPointerPosition();
 
-    switch (tool) {
+    switch (tool.type) {
       case "drawing":
         if (isDrawing) {
           setCurrentLine((prevLine) => [...prevLine, x, y]);
@@ -114,12 +149,22 @@ const App = () => {
           ) {
             setShapes((prevShapes) => [
               ...prevShapes.slice(0, prevShapes.length - 1),
-              { type: "line", points: currentLine, MouseMove: true },
+              {
+                type: "line",
+                points: currentLine,
+                MouseMove: true,
+                ...tool.properties,
+              },
             ]);
           } else {
             setShapes((prevShapes) => [
               ...prevShapes,
-              { type: "line", points: currentLine, MouseMove: true },
+              {
+                type: "line",
+                points: currentLine,
+                MouseMove: true,
+                ...tool.properties,
+              },
             ]);
           }
         }
@@ -140,6 +185,7 @@ const App = () => {
                 {
                   type: "line",
                   points: [...currentLine, x, y],
+                  ...tool.properties,
                   MouseMove: true,
                 },
               ];
@@ -149,6 +195,7 @@ const App = () => {
                 {
                   type: "line",
                   points: [...currentLine],
+                  ...tool.properties,
                   MouseMove: true,
                 },
               ];
@@ -182,6 +229,7 @@ const App = () => {
                       : y + radiusY,
                   radiusX,
                   radiusY,
+                  ...tool.properties,
                   MouseMove: true,
                 },
               ];
@@ -201,6 +249,7 @@ const App = () => {
                       : y + radiusY,
                   radiusX,
                   radiusY,
+                  ...tool.properties,
                   MouseMove: true,
                 },
               ];
@@ -232,7 +281,7 @@ const App = () => {
                   width: width,
                   height: height,
                   MouseMove: true,
-                  color: "white",
+                  ...tool.properties,
                 },
               ];
             } else {
@@ -246,7 +295,7 @@ const App = () => {
                   width: width, // Positive width
                   height: height, // Positive height
                   MouseMove: true,
-                  color: "white",
+                  ...tool.properties,
                 },
               ];
             }
@@ -262,12 +311,17 @@ const App = () => {
   const handleMouseUp = (e) => {
     const { x, y } = e.target.getStage().getPointerPosition();
 
-    switch (tool) {
+    switch (tool.type) {
       case "drawing":
         if (isDrawing) {
           setShapes((prevShapes) => [
             ...prevShapes.slice(0, prevShapes.length - 1),
-            { id: nanoid(), type: "line", points: currentLine },
+            {
+              id: nanoid(),
+              type: "line",
+              points: currentLine,
+              ...tool.properties,
+            },
           ]);
           setCurrentLine([]);
           setIsDrawing(false);
@@ -281,7 +335,7 @@ const App = () => {
             id: nanoid(),
             type: "line",
             points: [...currentLine.slice(0, 2), x, y],
-            color: "white",
+            ...tool.properties,
           },
         ]);
         setCurrentLine([]);
@@ -307,6 +361,7 @@ const App = () => {
                   : y + radiusY,
               radiusX,
               radiusY,
+              ...tool.properties,
             },
           ]);
           setStartPosition(undefined);
@@ -330,7 +385,7 @@ const App = () => {
               y: rectY,
               width: width,
               height: height,
-              color: "white",
+              ...tool.properties,
             },
           ];
         });
@@ -341,6 +396,14 @@ const App = () => {
       default:
         break;
     }
+  };
+
+  const handleTextChange = (id, newText) => {
+    setShapes((prevShapes) =>
+      prevShapes.map((shape) =>
+        shape.id === id ? { ...shape, text: newText } : shape
+      )
+    );
   };
 
   const renderSelectionBox = () => {
@@ -681,14 +744,66 @@ const App = () => {
   };
 
   return (
-    <div>
-      <div>
-        <button onClick={() => setTool("rectangle")}>Rectangle</button>
-        <button onClick={() => setTool("ellipse")}>Ellipse</button>
-        <button onClick={() => setTool("line")}>Line</button>
-        <button onClick={() => setTool("drawing")}>Draw</button>
-        <button onClick={() => setTool("freehand")}>Free</button>
+    <div className="w-full  flex items-center bg-black/50">
+      <div className="flex flex-col rounded-lg bg-[#232329] pt-2 pb-2 gap-2 z-50 sticky top-4 left-3">
+        <button
+          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
+          onClick={() => {
+            setTool({ type: "freehand" });
+          }}
+        >
+          <LiaHandPaperSolid size={20} />
+        </button>
+        <button
+          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
+          onClick={() =>
+            setTool({ type: "rectangle", properties: { color: "red" } })
+          }
+        >
+          <BiRectangle size={20} />
+        </button>
+        <button
+          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
+          onClick={() =>
+            setTool({ type: "ellipse", properties: { color: "red" } })
+          }
+        >
+          <MdOutlineCircle size={20} />
+        </button>
+        <button
+          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
+          onClick={() =>
+            setTool({ type: "arrow", properties: { color: "white" } })
+          }
+        >
+          <HiOutlineArrowLongRight size={20} />
+        </button>
+        <button
+          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
+          onClick={() =>
+            setTool({ type: "line", properties: { color: "white" } })
+          }
+        >
+          <TfiLayoutLineSolid size={20} />
+        </button>
+        <button
+          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
+          onClick={() =>
+            setTool({ type: "textbox", properties: { color: "white" } })
+          }
+        >
+          <CiText size={20} />
+        </button>
+        <button
+          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
+          onClick={() =>
+            setTool({ type: "drawing", properties: { color: "white" } })
+          }
+        >
+          <LuPenLine size={20} />
+        </button>
       </div>
+
       <Stage
         width={window.innerWidth}
         height={window.innerHeight}
@@ -725,7 +840,7 @@ const App = () => {
                   scaleY={
                     dragState.dragging && shape.id == dragState.id ? 1.05 : 1
                   }
-                  draggable={tool === "freehand"}
+                  draggable={tool.type === "freehand"}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
                   onMouseEnter={handleMouseEnter}
@@ -764,7 +879,7 @@ const App = () => {
                   scaleY={
                     dragState.dragging && shape.id == dragState.id ? 1.05 : 1
                   }
-                  draggable={tool === "freehand"}
+                  draggable={tool.type === "freehand"}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
                   onMouseEnter={handleMouseEnter}
@@ -803,7 +918,7 @@ const App = () => {
                   scaleY={
                     dragState.dragging && shape.id == dragState.id ? 1.05 : 1
                   }
-                  draggable={tool === "freehand"}
+                  draggable={tool.type === "freehand"}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
                   onMouseEnter={handleMouseEnter}
@@ -815,13 +930,41 @@ const App = () => {
                 />
               );
             }
+
             return null;
           })}
 
           {renderSelectionBox()}
-          <Rect x={0} y={0} height={100} width={100} stroke="red" />
         </Layer>
       </Stage>
+      {shapes.map((shape) => {
+        if (shape.type === "textbox") {
+          return (
+            <div
+              key={shape.id}
+              className="absolute"
+              style={{
+                left: `${shape.x}px`,
+                top: `${shape.y}px`,
+                fontFamily: shape.fontFamily,
+                fontSize: `${shape.fontSize}px`,
+                color: shape.color,
+                width: "200px",
+                height: "50px",
+              }}
+            >
+              <textarea
+                placeholder="Type..."
+                className="w-full h-full bg-transparent border-none resize"
+                value={shape.text}
+                onChange={(e) => handleTextChange(shape.id, e.target.value)}
+                autoFocus
+              />
+            </div>
+          );
+        }
+        return null;
+      })}
     </div>
   );
 };
