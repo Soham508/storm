@@ -1,16 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Stage, Layer, Rect, Arrow, Ellipse, Circle } from "react-konva";
 import { nanoid } from "nanoid";
 import { LiaHandPaperSolid } from "react-icons/lia";
 import { LuPenLine } from "react-icons/lu";
 import { TfiLayoutLineSolid } from "react-icons/tfi";
 import { HiOutlineArrowLongRight } from "react-icons/hi2";
-import { MdOutlineCircle } from "react-icons/md";
+import { MdOutlineCircle, MdOutlineRedo } from "react-icons/md";
 import { BiRectangle } from "react-icons/bi";
 import { CiText } from "react-icons/ci";
+import { MdOutlineUndo } from "react-icons/md";
+import { FiZoomIn, FiZoomOut } from "react-icons/fi";
 
 const App = () => {
   const [shapes, setShapes] = useState([{}]);
+  const [shapesBin, setShapesBin] = useState([{}]);
+  const stageRef = useRef(null);
+  const [scale, setScale] = useState(1);
   const [tool, setTool] = useState({
     type: "rectangle",
     properties: { color: "white" },
@@ -40,15 +45,29 @@ const App = () => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedShape, shapes]);
+  }, [shapes, selectedShape]);
+
+  useEffect(() => {
+    if (tool.type === "freehand") {
+      document.body.style.cursor = "grab";
+    } else {
+      document.body.style.cursor = "default";
+      setSelectedShape(undefined);
+    }
+    return () => {
+      document.body.style.cursor = "default";
+    };
+  }, [tool]);
 
   const handleStageClick = (e) => {
     const stage = e.target.getStage();
     const pointerPosition = stage.getPointerPosition();
+    //const pointerPosition = stage.getRelativePointerPosition();
 
     switch (tool.type) {
       case "freehand":
         setSelectedShape(null);
+
         break;
 
       case "textbox":
@@ -112,14 +131,19 @@ const App = () => {
 
   const handleMouseLeave = () => {
     if (tool.type === "freehand") {
-      document.body.style.cursor = "default";
+      document.body.style.cursor = "grab";
     }
   };
 
   const handleMouseDown = (e) => {
-    const { x, y } = e.target.getStage().getPointerPosition();
+    const { x, y } = e.target.getStage().getRelativePointerPosition();
 
     switch (tool.type) {
+      case "freehand":
+        document.body.style.cursor = "grabbing";
+
+        break;
+
       case "drawing":
         setIsDrawing(true);
         setCurrentLine([x, y]);
@@ -136,7 +160,7 @@ const App = () => {
   };
 
   const handleMouseMove = (e) => {
-    const { x, y } = e.target.getStage().getPointerPosition();
+    const { x, y } = e.target.getStage().getRelativePointerPosition();
 
     switch (tool.type) {
       case "drawing":
@@ -309,9 +333,12 @@ const App = () => {
   };
 
   const handleMouseUp = (e) => {
-    const { x, y } = e.target.getStage().getPointerPosition();
+    const { x, y } = e.target.getStage().getRelativePointerPosition();
 
     switch (tool.type) {
+      case "freehand":
+        document.body.style.cursor = "grab";
+        break;
       case "drawing":
         if (isDrawing) {
           setShapes((prevShapes) => [
@@ -743,229 +770,309 @@ const App = () => {
     return null;
   };
 
+  const handleUndo = () => {
+    if (shapes.length > 0) {
+      const undoShape = shapes[shapes.length - 1];
+      setShapes((prevShapes) => prevShapes.slice(0, prevShapes.length - 1)); // Remove the last shape
+      setShapesBin((prevShapesBin) => [...prevShapesBin, undoShape]); // Add the last shape to the undo bin
+    } else {
+      window.alert("Nothing to undo");
+    }
+  };
+
+  const handleRedo = () => {
+    if (shapesBin.length > 0) {
+      const redoShape = shapesBin[shapesBin.length - 1];
+      setShapes((prevShapes) => [...prevShapes, redoShape]); // Add the shape back to the shapes array
+      setShapesBin((prevShapesBin) =>
+        prevShapesBin.slice(0, prevShapesBin.length - 1)
+      ); // Remove the last undone shape from the bin
+    } else {
+      window.alert("Nothing to redo");
+    }
+  };
+
   return (
-    <div className="w-full  flex items-center bg-black/50">
-      <div className="flex flex-col rounded-lg bg-[#232329] pt-2 pb-2 gap-2 z-50 sticky top-4 left-3">
-        <button
-          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
-          onClick={() => {
-            setTool({ type: "freehand" });
-          }}
+    <>
+      <div className="w-full flex items-center bg-black/50 overflow-hidden">
+        <div className="flex flex-col w-16 items-center rounded-lg bg-[#232329] gap-2 pt-2 pb-2 z-50 sticky top-4 left-3">
+          <button
+            className={`bg-transparent flex items-center hover:bg-zinc-900  ${
+              tool.type == "freehand"
+                ? "bg-zinc-700  border-1 border-zinc-400"
+                : ""
+            } cursor-pointer h-12 w-14 `}
+            onClick={() => {
+              setTool({ type: "freehand" });
+            }}
+          >
+            <LiaHandPaperSolid size={24} />
+          </button>
+          <button
+            className={`bg-transparent flex items-center hover:bg-zinc-900 ${
+              tool.type == "rectangle"
+                ? "bg-zinc-700 border-1 border-zinc-400 "
+                : ""
+            } cursor-pointer h-12 w-14 `}
+            onClick={() =>
+              setTool({ type: "rectangle", properties: { color: "red" } })
+            }
+          >
+            <BiRectangle size={24} />
+          </button>
+          <button
+            className={`bg-transparent flex items-center hover:bg-zinc-900  ${
+              tool.type == "ellipse"
+                ? "bg-zinc-700 border-1 border-zinc-400 "
+                : ""
+            } cursor-pointer h-12 w-14 `}
+            onClick={() =>
+              setTool({ type: "ellipse", properties: { color: "red" } })
+            }
+          >
+            <MdOutlineCircle size={24} />
+          </button>
+          <button
+            className={`bg-transparent flex items-center hover:bg-zinc-9 00 ${
+              tool.type == "arrow"
+                ? "bg-zinc-700 border-1 border-zinc-400 "
+                : ""
+            } cursor-pointer h-12 w-14 `}
+            onClick={() =>
+              setTool({ type: "arrow", properties: { color: "white" } })
+            }
+          >
+            <HiOutlineArrowLongRight size={24} />
+          </button>
+          <button
+            className={`bg-transparent flex items-center hover:bg-zinc- 900 ${
+              tool.type == "line" ? "bg-zinc-700 border-1 border-zinc-400 " : ""
+            } cursor-pointer h-12 w-14 `}
+            onClick={() =>
+              setTool({ type: "line", properties: { color: "white" } })
+            }
+          >
+            <TfiLayoutLineSolid size={24} />
+          </button>
+          <button
+            className={`bg-transparent flex items-center hover:bg-zinc-900  ${
+              tool.type == "textbox"
+                ? "bg-zinc-700 border-1 border-zinc-400 "
+                : ""
+            } cursor-pointer h-12 w-14 `}
+            onClick={() =>
+              setTool({ type: "textbox", properties: { color: "white" } })
+            }
+          >
+            <CiText size={24} />
+          </button>
+          <button
+            className={`bg-transparent flex items-center hover:bg-zinc-900  ${
+              tool.type == "drawing"
+                ? "bg-zinc-700 border-1 border-zinc-400 "
+                : ""
+            } cursor-pointer h-12 w-14 `}
+            onClick={() =>
+              setTool({ type: "drawing", properties: { color: "white" } })
+            }
+          >
+            <LuPenLine size={24} />
+          </button>
+        </div>
+
+        <div className="absolute left-[50%] gap-0 flex cursor-pointer top-4 z-50">
+          <button onClick={handleUndo} className="rounded-r-[0]">
+            <MdOutlineUndo />
+          </button>
+          <button onClick={handleRedo} className="rounded-l-[0]">
+            <MdOutlineRedo />
+          </button>
+        </div>
+        <div className="absolute h-10 left-[50%] gap-0 flex cursor-pointer bottom-4 z-50">
+          <button
+            onClick={() => setScale((prev) => prev + 0.05)}
+            className="rounded-r-[0]"
+          >
+            <FiZoomIn />
+          </button>
+          <div className="h-full w-16 text-center flex items-center justify-center bg-[#242424]">
+            {(scale * 100).toFixed(0)}%
+          </div>
+          <button
+            onClick={() => setScale((prev) => prev - 0.05)}
+            className="rounded-l-[0]"
+          >
+            <FiZoomOut />
+          </button>
+        </div>
+
+        <Stage
+          width={window.innerWidth}
+          height={window.innerHeight}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          ref={stageRef}
+          scaleX={scale}
+          scaleY={scale}
+          onClick={handleStageClick}
+          draggable={tool.type == "freehand"}
         >
-          <LiaHandPaperSolid size={20} />
-        </button>
-        <button
-          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
-          onClick={() =>
-            setTool({ type: "rectangle", properties: { color: "red" } })
+          <Layer>
+            {shapes.map((shape, index) => {
+              if (shape.type === "rectangle") {
+                return (
+                  <Rect
+                    key={index}
+                    id={shape.id}
+                    name="rectangle"
+                    x={shape.x}
+                    y={shape.y}
+                    width={shape.width}
+                    height={shape.height}
+                    stroke={shape.color || "white"}
+                    shadowColor="white"
+                    shadowBlur={15}
+                    shadowOpacity={0.9}
+                    shadowOffsetX={
+                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                    }
+                    shadowOffsetY={
+                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                    }
+                    scaleX={
+                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
+                    }
+                    scaleY={
+                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
+                    }
+                    draggable={tool.type === "freehand"}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                    onClick={(e) => {
+                      handleShapeClick(e, shape);
+                    }}
+                  />
+                );
+              }
+              if (shape.type === "ellipse") {
+                return (
+                  <Ellipse
+                    key={index}
+                    id={shape.id}
+                    name="ellipse"
+                    x={shape.x}
+                    y={shape.y}
+                    fillPatternOffset={[100, 200]}
+                    radiusX={shape.radiusX}
+                    radiusY={shape.radiusY}
+                    strokeWidth={2}
+                    stroke={shape.color || "white"}
+                    shadowColor="white"
+                    shadowBlur={15}
+                    shadowOpacity={0.9}
+                    shadowOffsetX={
+                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                    }
+                    shadowOffsetY={
+                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                    }
+                    scaleX={
+                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
+                    }
+                    scaleY={
+                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
+                    }
+                    draggable={tool.type === "freehand"}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                    onClick={(e) => {
+                      handleShapeClick(e, shape);
+                    }}
+                  />
+                );
+              }
+              if (shape.type === "line") {
+                return (
+                  <Arrow
+                    key={index}
+                    id={shape.id}
+                    name="line"
+                    points={shape.points}
+                    stroke={shape.color || "white"}
+                    strokeWidth={3}
+                    tension={0.5}
+                    lineCap="round"
+                    pointerAtBeginning={false}
+                    pointerAtEnding={false}
+                    shadowColor="white"
+                    shadowBlur={15}
+                    shadowOpacity={0.9}
+                    shadowOffsetX={
+                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                    }
+                    shadowOffsetY={
+                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                    }
+                    scaleX={
+                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
+                    }
+                    scaleY={
+                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
+                    }
+                    draggable={tool.type === "freehand"}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                    onClick={(e) => {
+                      console.log(e.target.attrs.points);
+                      handleShapeClick(e, shape);
+                    }}
+                  />
+                );
+              }
+
+              return null;
+            })}
+
+            {renderSelectionBox()}
+          </Layer>
+        </Stage>
+        {shapes.map((shape) => {
+          if (shape.type === "textbox") {
+            return (
+              <div
+                key={shape.id}
+                className="absolute"
+                style={{
+                  left: `${shape.x}px`,
+                  top: `${shape.y}px`,
+                  fontFamily: shape.fontFamily,
+                  fontSize: `${shape.fontSize}px`,
+                  color: shape.color,
+                  width: "200px",
+                  height: "50px",
+                }}
+              >
+                <textarea
+                  placeholder="Type..."
+                  className="w-full h-full bg-transparent border-none resize"
+                  value={shape.text}
+                  onChange={(e) => handleTextChange(shape.id, e.target.value)}
+                  autoFocus
+                />
+              </div>
+            );
           }
-        >
-          <BiRectangle size={20} />
-        </button>
-        <button
-          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
-          onClick={() =>
-            setTool({ type: "ellipse", properties: { color: "red" } })
-          }
-        >
-          <MdOutlineCircle size={20} />
-        </button>
-        <button
-          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
-          onClick={() =>
-            setTool({ type: "arrow", properties: { color: "white" } })
-          }
-        >
-          <HiOutlineArrowLongRight size={20} />
-        </button>
-        <button
-          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
-          onClick={() =>
-            setTool({ type: "line", properties: { color: "white" } })
-          }
-        >
-          <TfiLayoutLineSolid size={20} />
-        </button>
-        <button
-          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
-          onClick={() =>
-            setTool({ type: "textbox", properties: { color: "white" } })
-          }
-        >
-          <CiText size={20} />
-        </button>
-        <button
-          className="bg-transparent hover:bg-zinc-900 cursor-pointer h-12"
-          onClick={() =>
-            setTool({ type: "drawing", properties: { color: "white" } })
-          }
-        >
-          <LuPenLine size={20} />
-        </button>
+          return null;
+        })}
       </div>
-
-      <Stage
-        width={window.innerWidth}
-        height={window.innerHeight}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onClick={handleStageClick}
-      >
-        <Layer>
-          {shapes.map((shape, index) => {
-            if (shape.type === "rectangle") {
-              return (
-                <Rect
-                  key={index}
-                  id={shape.id}
-                  name="rectangle"
-                  x={shape.x}
-                  y={shape.y}
-                  width={shape.width}
-                  height={shape.height}
-                  stroke={shape.color || "white"}
-                  shadowColor="white"
-                  shadowBlur={15}
-                  shadowOpacity={0.9}
-                  shadowOffsetX={
-                    dragState.dragging && shape.id == dragState.id ? 6 : 0
-                  }
-                  shadowOffsetY={
-                    dragState.dragging && shape.id == dragState.id ? 6 : 0
-                  }
-                  scaleX={
-                    dragState.dragging && shape.id == dragState.id ? 1.05 : 1
-                  }
-                  scaleY={
-                    dragState.dragging && shape.id == dragState.id ? 1.05 : 1
-                  }
-                  draggable={tool.type === "freehand"}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  onMouseEnter={handleMouseEnter}
-                  onMouseLeave={handleMouseLeave}
-                  onClick={(e) => {
-                    handleShapeClick(e, shape);
-                  }}
-                />
-              );
-            }
-            if (shape.type === "ellipse") {
-              return (
-                <Ellipse
-                  key={index}
-                  id={shape.id}
-                  name="ellipse"
-                  x={shape.x}
-                  y={shape.y}
-                  fillPatternOffset={[100, 200]}
-                  radiusX={shape.radiusX}
-                  radiusY={shape.radiusY}
-                  strokeWidth={2}
-                  stroke={shape.color || "white"}
-                  shadowColor="white"
-                  shadowBlur={15}
-                  shadowOpacity={0.9}
-                  shadowOffsetX={
-                    dragState.dragging && shape.id == dragState.id ? 6 : 0
-                  }
-                  shadowOffsetY={
-                    dragState.dragging && shape.id == dragState.id ? 6 : 0
-                  }
-                  scaleX={
-                    dragState.dragging && shape.id == dragState.id ? 1.05 : 1
-                  }
-                  scaleY={
-                    dragState.dragging && shape.id == dragState.id ? 1.05 : 1
-                  }
-                  draggable={tool.type === "freehand"}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  onMouseEnter={handleMouseEnter}
-                  onMouseLeave={handleMouseLeave}
-                  onClick={(e) => {
-                    handleShapeClick(e, shape);
-                  }}
-                />
-              );
-            }
-            if (shape.type === "line") {
-              return (
-                <Arrow
-                  key={index}
-                  id={shape.id}
-                  name="line"
-                  points={shape.points}
-                  stroke={shape.color || "white"}
-                  strokeWidth={3}
-                  tension={0.5}
-                  lineCap="round"
-                  pointerAtBeginning={false}
-                  pointerAtEnding={false}
-                  shadowColor="white"
-                  shadowBlur={15}
-                  shadowOpacity={0.9}
-                  shadowOffsetX={
-                    dragState.dragging && shape.id == dragState.id ? 6 : 0
-                  }
-                  shadowOffsetY={
-                    dragState.dragging && shape.id == dragState.id ? 6 : 0
-                  }
-                  scaleX={
-                    dragState.dragging && shape.id == dragState.id ? 1.05 : 1
-                  }
-                  scaleY={
-                    dragState.dragging && shape.id == dragState.id ? 1.05 : 1
-                  }
-                  draggable={tool.type === "freehand"}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  onMouseEnter={handleMouseEnter}
-                  onMouseLeave={handleMouseLeave}
-                  onClick={(e) => {
-                    console.log(e.target.attrs.points);
-                    handleShapeClick(e, shape);
-                  }}
-                />
-              );
-            }
-
-            return null;
-          })}
-
-          {renderSelectionBox()}
-        </Layer>
-      </Stage>
-      {shapes.map((shape) => {
-        if (shape.type === "textbox") {
-          return (
-            <div
-              key={shape.id}
-              className="absolute"
-              style={{
-                left: `${shape.x}px`,
-                top: `${shape.y}px`,
-                fontFamily: shape.fontFamily,
-                fontSize: `${shape.fontSize}px`,
-                color: shape.color,
-                width: "200px",
-                height: "50px",
-              }}
-            >
-              <textarea
-                placeholder="Type..."
-                className="w-full h-full bg-transparent border-none resize"
-                value={shape.text}
-                onChange={(e) => handleTextChange(shape.id, e.target.value)}
-                autoFocus
-              />
-            </div>
-          );
-        }
-        return null;
-      })}
-    </div>
+    </>
   );
 };
 
