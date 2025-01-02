@@ -30,9 +30,6 @@ const App = () => {
   const [startPosition, setStartPosition] = useState(undefined);
 
   useEffect(() => {
-    console.log(selectedShape);
-    console.log(shapes);
-
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === "f") {
         e.preventDefault();
@@ -45,6 +42,11 @@ const App = () => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
+  }, []);
+
+  useEffect(() => {
+    console.log(selectedShape);
+    console.log(shapes);
   }, [shapes, selectedShape]);
 
   useEffect(() => {
@@ -78,6 +80,8 @@ const App = () => {
             type: "textbox",
             x: pointerPosition.x,
             y: pointerPosition.y,
+            horizontalShift: 0,
+            verticalShift: 0,
             fontFamily: "Arial",
             fontSize: 20,
             ...tool.properties,
@@ -153,6 +157,10 @@ const App = () => {
         setCurrentLine([x, y]);
         break;
 
+      case "arrow":
+        setCurrentLine([x, y]);
+        break;
+
       default:
         setStartPosition({ startX: x, startY: y });
         break;
@@ -218,6 +226,40 @@ const App = () => {
                 ...prevShapes,
                 {
                   type: "line",
+                  points: [...currentLine],
+                  ...tool.properties,
+                  MouseMove: true,
+                },
+              ];
+            }
+          });
+        }
+        break;
+
+      case "arrow":
+        if (currentLine.length >= 2) {
+          setCurrentLine((prevLine) => [...prevLine.slice(0, 2), x, y]);
+
+          // Update the last line shape in the shapes array
+          setShapes((prevShapes) => {
+            if (
+              prevShapes[prevShapes.length - 1]?.MouseMove &&
+              prevShapes[prevShapes.length - 1]?.type === "arrow"
+            ) {
+              return [
+                ...prevShapes.slice(0, prevShapes.length - 1),
+                {
+                  type: "arrow",
+                  points: [...currentLine, x, y],
+                  ...tool.properties,
+                  MouseMove: true,
+                },
+              ];
+            } else {
+              return [
+                ...prevShapes,
+                {
+                  type: "arrow",
                   points: [...currentLine],
                   ...tool.properties,
                   MouseMove: true,
@@ -335,36 +377,58 @@ const App = () => {
   const handleMouseUp = (e) => {
     const { x, y } = e.target.getStage().getRelativePointerPosition();
 
+    // In order to avoid conflict of onClick and MouseDown+MouseUp, use MouseMove property defined during mousemove
     switch (tool.type) {
       case "freehand":
         document.body.style.cursor = "grab";
         break;
+
       case "drawing":
         if (isDrawing) {
-          setShapes((prevShapes) => [
-            ...prevShapes.slice(0, prevShapes.length - 1),
-            {
-              id: nanoid(),
-              type: "line",
-              points: currentLine,
-              ...tool.properties,
-            },
-          ]);
+          if (shapes[shapes.length - 1].MouseMove) {
+            setShapes((prevShapes) => [
+              ...prevShapes.slice(0, prevShapes.length - 1),
+              {
+                id: nanoid(),
+                type: "line",
+                points: currentLine,
+                ...tool.properties,
+              },
+            ]);
+          }
           setCurrentLine([]);
           setIsDrawing(false);
         }
         break;
 
       case "line":
-        setShapes((prevShapes) => [
-          ...prevShapes.slice(0, prevShapes.length - 1),
-          {
-            id: nanoid(),
-            type: "line",
-            points: [...currentLine.slice(0, 2), x, y],
-            ...tool.properties,
-          },
-        ]);
+        if (shapes[shapes.length - 1].MouseMove) {
+          setShapes((prevShapes) => [
+            ...prevShapes.slice(0, prevShapes.length - 1),
+            {
+              id: nanoid(),
+              type: "line",
+              points: [...currentLine.slice(0, 2), x, y],
+              ...tool.properties,
+            },
+          ]);
+        }
+
+        setCurrentLine([]);
+        break;
+
+      case "arrow":
+        if (shapes[shapes.length - 1].MouseMove) {
+          setShapes((prevShapes) => [
+            ...prevShapes.slice(0, prevShapes.length - 1),
+            {
+              id: nanoid(),
+              type: "arrow",
+              points: [...currentLine.slice(0, 2), x, y],
+              ...tool.properties,
+            },
+          ]);
+        }
         setCurrentLine([]);
         break;
 
@@ -373,50 +437,53 @@ const App = () => {
           const radiusX = Math.abs(startPosition.startX - x) / 2;
           const radiusY = Math.abs(startPosition.startY - y) / 2;
 
-          setShapes((prevShapes) => [
-            ...prevShapes.slice(0, prevShapes.length - 1),
-            {
-              id: nanoid(),
-              type: "ellipse",
-              x:
-                x > startPosition.startX
-                  ? startPosition.startX + radiusX
-                  : x + radiusX,
-              y:
-                y > startPosition.startY
-                  ? startPosition.startY + radiusY
-                  : y + radiusY,
-              radiusX,
-              radiusY,
-              ...tool.properties,
-            },
-          ]);
+          if (shapes[shapes.length - 1].MouseMove) {
+            setShapes((prevShapes) => [
+              ...prevShapes.slice(0, prevShapes.length - 1),
+              {
+                id: nanoid(),
+                type: "ellipse",
+                x:
+                  x > startPosition.startX
+                    ? startPosition.startX + radiusX
+                    : x + radiusX,
+                y:
+                  y > startPosition.startY
+                    ? startPosition.startY + radiusY
+                    : y + radiusY,
+                radiusX,
+                radiusY,
+                ...tool.properties,
+              },
+            ]);
+          }
           setStartPosition(undefined);
         }
         break;
 
       case "rectangle":
-        setShapes((prevShapes) => {
-          const width = Math.abs(x - startPosition.startX);
-          const height = Math.abs(y - startPosition.startY);
+        if (shapes[shapes.length - 1].MouseMove) {
+          setShapes((prevShapes) => {
+            const width = Math.abs(x - startPosition.startX);
+            const height = Math.abs(y - startPosition.startY);
 
-          const rectX = x > startPosition.startX ? startPosition.startX : x;
-          const rectY = y > startPosition.startY ? startPosition.startY : y;
+            const rectX = x > startPosition.startX ? startPosition.startX : x;
+            const rectY = y > startPosition.startY ? startPosition.startY : y;
 
-          return [
-            ...prevShapes.slice(0, prevShapes.length - 1),
-            {
-              id: nanoid(),
-              type: "rectangle",
-              x: rectX,
-              y: rectY,
-              width: width,
-              height: height,
-              ...tool.properties,
-            },
-          ];
-        });
-
+            return [
+              ...prevShapes.slice(0, prevShapes.length - 1),
+              {
+                id: nanoid(),
+                type: "rectangle",
+                x: rectX,
+                y: rectY,
+                width: width,
+                height: height,
+                ...tool.properties,
+              },
+            ];
+          });
+        }
         setStartPosition(undefined);
         break;
 
@@ -917,6 +984,29 @@ const App = () => {
           scaleY={scale}
           onClick={handleStageClick}
           draggable={tool.type == "freehand"}
+          onDragMove={(e) => {
+            const stage = e.target.getStage();
+            const pointerPosition = stage.getPointerPosition();
+            const pointerRelativePosition = stage.getRelativePointerPosition();
+            console.log(pointerPosition);
+            console.log(pointerRelativePosition);
+            const verticalShift = pointerPosition.y - pointerRelativePosition.y;
+            const horizontalShift =
+              pointerPosition.x - pointerRelativePosition.x;
+            setShapes((prevShapes) =>
+              prevShapes.map((shape) =>
+                shape.type === "textbox"
+                  ? {
+                      ...shape,
+                      horizontalShift:
+                        shape.horizontalShift - pointerRelativePosition.x,
+                      verticalShift:
+                        shape.verticalShift - pointerRelativePosition.y,
+                    }
+                  : shape
+              )
+            );
+          }}
         >
           <Layer>
             {shapes.map((shape, index) => {
@@ -957,6 +1047,7 @@ const App = () => {
                   />
                 );
               }
+
               if (shape.type === "ellipse") {
                 return (
                   <Ellipse
@@ -996,6 +1087,7 @@ const App = () => {
                   />
                 );
               }
+
               if (shape.type === "line") {
                 return (
                   <Arrow
@@ -1037,6 +1129,47 @@ const App = () => {
                 );
               }
 
+              if (shape.type === "arrow") {
+                return (
+                  <Arrow
+                    key={index}
+                    id={shape.id}
+                    name="line"
+                    points={shape.points}
+                    stroke={shape.color || "white"}
+                    strokeWidth={3}
+                    tension={0.5}
+                    lineCap="round"
+                    pointerAtBeginning={false}
+                    pointerAtEnding={true}
+                    shadowColor="white"
+                    shadowBlur={15}
+                    shadowOpacity={0.9}
+                    shadowOffsetX={
+                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                    }
+                    shadowOffsetY={
+                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                    }
+                    scaleX={
+                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
+                    }
+                    scaleY={
+                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
+                    }
+                    draggable={tool.type === "freehand"}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                    onClick={(e) => {
+                      console.log(e.target.attrs.points);
+                      handleShapeClick(e, shape);
+                    }}
+                  />
+                );
+              }
+
               return null;
             })}
 
@@ -1050,13 +1183,13 @@ const App = () => {
                 key={shape.id}
                 className="absolute"
                 style={{
-                  left: `${shape.x}px`,
-                  top: `${shape.y}px`,
+                  left: `${shape.x + shape.horizontalShift}px`,
+                  top: `${shape.y + shape.verticalShift}px`,
                   fontFamily: shape.fontFamily,
                   fontSize: `${shape.fontSize}px`,
                   color: shape.color,
                   width: "200px",
-                  height: "50px",
+                  height: "40px",
                 }}
               >
                 <textarea
