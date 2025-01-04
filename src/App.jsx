@@ -5,11 +5,14 @@ import { LiaHandPaperSolid } from "react-icons/lia";
 import { LuPenLine } from "react-icons/lu";
 import { TfiLayoutLineSolid } from "react-icons/tfi";
 import { HiOutlineArrowLongRight } from "react-icons/hi2";
+import { TbArrowCurveLeft } from "react-icons/tb";
 import { MdOutlineCircle, MdOutlineRedo } from "react-icons/md";
 import { BiRectangle } from "react-icons/bi";
 import { CiText } from "react-icons/ci";
 import { MdOutlineUndo } from "react-icons/md";
 import { FiZoomIn, FiZoomOut } from "react-icons/fi";
+import { FiMenu } from "react-icons/fi";
+import Menubar from "./components/Menubar";
 
 const App = () => {
   const [shapes, setShapes] = useState([{}]);
@@ -20,9 +23,11 @@ const App = () => {
     type: "rectangle",
     properties: { color: "white" },
   });
+  const [menu, setMenu] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedShape, setSelectedShape] = useState(undefined);
   const [currentLine, setCurrentLine] = useState([]);
+  const [tempData, setTempData] = useState({});
   const [dragState, setDragState] = useState({
     dragging: false,
     id: undefined,
@@ -30,18 +35,12 @@ const App = () => {
   const [startPosition, setStartPosition] = useState(undefined);
 
   useEffect(() => {
-    const handleToolKeyDown = (e) => {
-      if (e.ctrlKey && e.key === "f") {
-        e.preventDefault();
-        setTool({ type: "freehand" });
-      }
-    };
-
     window.addEventListener("keydown", handleToolKeyDown);
 
     return () => {
       window.removeEventListener("keydown", handleToolKeyDown);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -59,6 +58,8 @@ const App = () => {
   }, [selectedShape]);
 
   useEffect(() => {
+    setTempData({});
+    setCurrentLine([]);
     if (tool.type === "freehand") {
       document.body.style.cursor = "grab";
     } else {
@@ -69,6 +70,19 @@ const App = () => {
       document.body.style.cursor = "default";
     };
   }, [tool]);
+
+  const handleToolKeyDown = (e) => {
+    if (e.ctrlKey && e.key === "f") {
+      e.preventDefault();
+      setTool({ type: "freehand" });
+    } else if (e.ctrlKey && e.key === "z") {
+      e.preventDefault();
+      handleUndo();
+    } else if (e.ctrlKey && e.key === "x") {
+      e.preventDefault();
+      handleRedo();
+    }
+  };
 
   const handleKeyDownShape = (e) => {
     e.preventDefault();
@@ -142,12 +156,23 @@ const App = () => {
 
   const handleStageClick = (e) => {
     const stage = e.target.getStage();
-    // const pointerPosition = stage.getPointerPosition();
-    const pointerPosition = stage.getRelativePointerPosition();
+    const pointerPosition = stage.getPointerPosition();
 
     switch (tool.type) {
       case "freehand":
         setSelectedShape(null);
+        break;
+
+      case "curve":
+        setCurrentLine((prev) => [
+          ...prev,
+          pointerPosition.x,
+          pointerPosition.y,
+        ]);
+        setTempData((prev) => ({
+          ...prev,
+          curvePoints: prev.curvePoints ? prev.curvePoints + 1 : 1,
+        }));
 
         break;
 
@@ -237,6 +262,8 @@ const App = () => {
     }
   };
 
+  //------------------- Create shapes-----------------//
+
   const handleMouseDown = (e) => {
     const { x, y } = e.target.getStage().getRelativePointerPosition();
 
@@ -253,6 +280,13 @@ const App = () => {
       case "arrow":
         setCurrentLine([x, y]);
         break;
+
+      //case "curve":
+      //  if (currentLine.length === 0) {
+      //    setCurrentLine([x, y]);
+      //    setTempData({ curvePoints: 1 });
+      //  }
+      //  break;
 
       default:
         setStartPosition({ startX: x, startY: y });
@@ -353,6 +387,43 @@ const App = () => {
                 ...prevShapes,
                 {
                   type: "arrow",
+                  points: [...currentLine],
+                  ...tool.properties,
+                  MouseMove: true,
+                },
+              ];
+            }
+          });
+        }
+        break;
+
+      case "curve":
+        if (currentLine.length >= 2) {
+          setCurrentLine((prevLine) => [
+            ...prevLine.slice(0, 2 * tempData.curvePoints),
+            x,
+            y,
+          ]);
+
+          setShapes((prevShapes) => {
+            if (
+              prevShapes[prevShapes.length - 1]?.MouseMove &&
+              prevShapes[prevShapes.length - 1]?.type === "curve"
+            ) {
+              return [
+                ...prevShapes.slice(0, prevShapes.length - 1),
+                {
+                  type: "curve",
+                  points: [...currentLine, x, y],
+                  ...tool.properties,
+                  MouseMove: true,
+                },
+              ];
+            } else {
+              return [
+                ...prevShapes,
+                {
+                  type: "curve",
                   points: [...currentLine],
                   ...tool.properties,
                   MouseMove: true,
@@ -584,6 +655,34 @@ const App = () => {
         break;
     }
   };
+
+  const handleDblClick = (e) => {
+    const { x, y } = e.target.getStage().getRelativePointerPosition();
+
+    switch (tool.type) {
+      case "curve":
+        if (shapes[shapes.length - 1].MouseMove) {
+          setShapes((prevShapes) => [
+            ...prevShapes.slice(0, prevShapes.length - 1),
+            {
+              id: nanoid(),
+              type: "curve",
+              points: [...currentLine, x, y],
+              ...tool.properties,
+            },
+          ]);
+        }
+
+        setCurrentLine([]);
+        setTempData((prev) => ({ ...prev, curvePoints: 0 }));
+        break;
+
+      default:
+        break;
+    }
+  };
+
+  //---------------------------------------------------//
 
   const renderSelectionBox = () => {
     if (!selectedShape) return null;
@@ -953,7 +1052,25 @@ const App = () => {
   return (
     <>
       <div className="w-full flex items-center bg-black/50 overflow-hidden">
-        <div className="flex flex-col w-16 items-center rounded-lg bg-[#232329] gap-2 pt-2 pb-2 z-50 sticky top-4 left-3">
+        <button
+          className="absolute h-12 w-14 p-0 top-4 left-4 flex items-center justify-center cursor-pointer z-50"
+          onClick={() => setMenu((prev) => !prev)}
+        >
+          <FiMenu size={20} />
+        </button>
+
+        {menu && (
+          <>
+            <Menubar stageRef={stageRef} />
+          </>
+        )}
+
+        <div
+          className="flex flex-col w-16 items-center rounded-lg bg-[#232329] gap-2 pt-2 pb-2 z-40 absolute top-50 left-3"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
           <button
             className={`bg-transparent flex items-center hover:bg-zinc-900  ${
               tool.type == "freehand"
@@ -991,7 +1108,7 @@ const App = () => {
             <MdOutlineCircle size={24} />
           </button>
           <button
-            className={`bg-transparent flex items-center hover:bg-zinc-9 00 ${
+            className={`bg-transparent flex items-center hover:bg-zinc-900 ${
               tool.type == "arrow"
                 ? "bg-zinc-700 border-1 border-zinc-400 "
                 : ""
@@ -1003,7 +1120,7 @@ const App = () => {
             <HiOutlineArrowLongRight size={24} />
           </button>
           <button
-            className={`bg-transparent flex items-center hover:bg-zinc- 900 ${
+            className={`bg-transparent flex items-center hover:bg-zinc-900 ${
               tool.type == "line" ? "bg-zinc-700 border-1 border-zinc-400 " : ""
             } cursor-pointer h-12 w-14 `}
             onClick={() =>
@@ -1011,6 +1128,18 @@ const App = () => {
             }
           >
             <TfiLayoutLineSolid size={24} />
+          </button>
+          <button
+            className={`bg-transparent flex items-center hover:bg-zinc-900 ${
+              tool.type == "curve"
+                ? "bg-zinc-700 border-1 border-zinc-400 "
+                : ""
+            } cursor-pointer h-12 w-14 `}
+            onClick={() =>
+              setTool({ type: "curve", properties: { color: "white" } })
+            }
+          >
+            <TbArrowCurveLeft size={24} />
           </button>
           <button
             className={`bg-transparent flex items-center hover:bg-zinc-900  ${
@@ -1070,6 +1199,7 @@ const App = () => {
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onDblClick={handleDblClick}
           onDragStart={handleStageDragStart}
           ref={stageRef}
           scaleX={scale}
@@ -1078,6 +1208,11 @@ const App = () => {
           draggable={tool.type == "freehand"}
         >
           <Layer>
+            <Arrow
+              points={[100, 100, 200, 150, 300, 400]}
+              tension={0.5}
+              stroke="white"
+            />
             {shapes.map((shape, index) => {
               if (shape.type === "rectangle") {
                 return (
@@ -1204,7 +1339,7 @@ const App = () => {
                   <Arrow
                     key={index}
                     id={shape.id}
-                    name="line"
+                    name="arrow"
                     points={shape.points}
                     stroke={shape.color || "white"}
                     strokeWidth={3}
@@ -1212,6 +1347,44 @@ const App = () => {
                     lineCap="round"
                     pointerAtBeginning={false}
                     pointerAtEnding={true}
+                    shadowColor="white"
+                    shadowBlur={15}
+                    shadowOpacity={0.9}
+                    shadowOffsetX={
+                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                    }
+                    shadowOffsetY={
+                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                    }
+                    draggable={tool.type === "freehand"}
+                    onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
+                    onDragEnd={handleDragEnd}
+                    onMouseEnter={(e) => {
+                      handleMouseEnter(e);
+                    }}
+                    onMouseLeave={handleMouseLeave}
+                    onClick={(e) => {
+                      handleShapeClick(e, shape);
+                    }}
+                  />
+                );
+              }
+
+              if (shape.type === "curve") {
+                return (
+                  <Arrow
+                    key={index}
+                    id={shape.id}
+                    name="curve"
+                    points={shape.points}
+                    stroke={shape.color || "white"}
+                    strokeWidth={3}
+                    tension={0}
+                    closed={false}
+                    lineCap="butt"
+                    pointerAtBeginning={false}
+                    pointerAtEnding={false}
                     shadowColor="white"
                     shadowBlur={15}
                     shadowOpacity={0.9}
