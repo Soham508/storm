@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Stage, Layer, Rect, Arrow, Ellipse, Circle } from "react-konva";
+import { Stage, Layer, Rect, Arrow, Ellipse, Circle, Text } from "react-konva";
 import { nanoid } from "nanoid";
 import { LiaHandPaperSolid } from "react-icons/lia";
 import { LuPenLine } from "react-icons/lu";
@@ -30,24 +30,33 @@ const App = () => {
   const [startPosition, setStartPosition] = useState(undefined);
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleToolKeyDown = (e) => {
       if (e.ctrlKey && e.key === "f") {
         e.preventDefault();
         setTool({ type: "freehand" });
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleToolKeyDown);
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleToolKeyDown);
     };
   }, []);
 
   useEffect(() => {
     console.log(selectedShape);
-    console.log(shapes);
-  }, [shapes, selectedShape]);
+    if (selectedShape && selectedShape.type === "textbox") {
+      window.addEventListener("keydown", handleKeyDownText);
+    } else if (selectedShape) {
+      window.addEventListener("keydown", handleKeyDownShape);
+    }
+    return () => {
+      window.removeEventListener("keydown", handleKeyDownText);
+      window.removeEventListener("keydown", handleKeyDownShape);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedShape]);
 
   useEffect(() => {
     if (tool.type === "freehand") {
@@ -61,10 +70,80 @@ const App = () => {
     };
   }, [tool]);
 
+  const handleKeyDownShape = (e) => {
+    e.preventDefault();
+    if (!selectedShape) return;
+
+    if (e.ctrlKey && e.key === "c") {
+      setShapes((prev) => [
+        ...prev,
+        {
+          ...selectedShape,
+          id: nanoid(),
+          x: selectedShape.x + 15,
+          y: selectedShape.y + 15,
+        },
+      ]);
+    } else if (e.key === "Delete" || (e.ctrlKey && e.key === "d")) {
+      setShapesBin((prevShapesBin) => [...prevShapesBin, { ...selectedShape }]);
+      setShapes((prevShapes) =>
+        prevShapes.filter((shape) => shape.id != selectedShape.id)
+      );
+      setSelectedShape(null);
+    }
+  };
+  const handleKeyDownText = (e) => {
+    if (!selectedShape) return;
+
+    const key = e.key;
+    if (key === "Backspace") {
+      setShapes((prevShapes) =>
+        prevShapes.map((shape) => {
+          if (shape.id === selectedShape.id) {
+            return {
+              ...shape,
+              text: shape.text.slice(0, -1),
+            };
+          }
+          return shape;
+        })
+      );
+    } else if (e.shiftKey) {
+      // Check if the key pressed is a letter (a-z or A-Z)
+      if (
+        e.key.length === 1 &&
+        /^[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};`~':"\\|,.<>/? ]$/.test(e.key)
+      ) {
+        setShapes((prevShapes) =>
+          prevShapes.map((shape) => {
+            if (shape.id === selectedShape.id) {
+              console.log(shape.text);
+              return { ...shape, text: shape.text + e.key.toUpperCase() };
+            }
+            return shape;
+          })
+        );
+      }
+    } else if (
+      e.key.length === 1 &&
+      /^[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};`~':"\\|,.<>/? ]$/.test(e.key)
+    ) {
+      setShapes((prevShapes) =>
+        prevShapes.map((shape) => {
+          if (shape.id === selectedShape.id) {
+            console.log(shape.text);
+            return { ...shape, text: shape.text + key };
+          }
+          return shape;
+        })
+      );
+    }
+  };
+
   const handleStageClick = (e) => {
     const stage = e.target.getStage();
-    const pointerPosition = stage.getPointerPosition();
-    //const pointerPosition = stage.getRelativePointerPosition();
+    // const pointerPosition = stage.getPointerPosition();
+    const pointerPosition = stage.getRelativePointerPosition();
 
     switch (tool.type) {
       case "freehand":
@@ -73,9 +152,8 @@ const App = () => {
         break;
 
       case "textbox":
-        setShapes([
-          ...shapes,
-          {
+        setShapes(() => {
+          const newShape = {
             id: nanoid(),
             type: "textbox",
             x: pointerPosition.x,
@@ -83,11 +161,13 @@ const App = () => {
             horizontalShift: 0,
             verticalShift: 0,
             fontFamily: "Arial",
-            fontSize: 20,
+            fontSize: 24,
             ...tool.properties,
-            text: "",
-          },
-        ]);
+            text: "Type",
+          };
+          setSelectedShape(newShape);
+          return [...shapes, newShape];
+        });
         break;
 
       default:
@@ -98,22 +178,39 @@ const App = () => {
   const handleShapeClick = (e, shape) => {
     if (tool.type === "freehand") {
       e.cancelBubble = true; // Prevent event from propagating to the Stage
+      if (selectedShape && selectedShape.id === shape.id) {
+        setSelectedShape(null);
+        return;
+      }
       setSelectedShape(shape);
     }
   };
 
   const handleDragStart = (e) => {
+    e.cancelBubble = true;
+    if (tool.type === "freehand") {
+      document.body.style.cursor = "move";
+    }
     const id = e.target.id();
     setDragState({ dragging: true, id: id });
   };
 
+  const handleDragMove = () => {
+    if (tool.type === "freehand") {
+      document.body.style.cursor = "move";
+    }
+  };
+
   const handleDragEnd = (e) => {
+    if (tool.type === "freehand") {
+      document.body.style.cursor = "move";
+    }
+
     const id = e.target.id();
     const { x, y } = e.target.position();
 
     if (e.target.name() === "line") {
       const points = e.target.points();
-      console.log(points);
       setShapes((prev) =>
         prev.map((shape) => (shape.id === id ? { ...shape, points } : shape))
       );
@@ -127,9 +224,10 @@ const App = () => {
     setDragState({ dragging: false, id: undefined });
   };
 
-  const handleMouseEnter = () => {
+  const handleMouseEnter = (e) => {
     if (tool.type === "freehand") {
-      document.body.style.cursor = "pointer";
+      document.body.style.cursor = "move";
+      e.cancelBubble = true;
     }
   };
 
@@ -143,11 +241,6 @@ const App = () => {
     const { x, y } = e.target.getStage().getRelativePointerPosition();
 
     switch (tool.type) {
-      case "freehand":
-        document.body.style.cursor = "grabbing";
-
-        break;
-
       case "drawing":
         setIsDrawing(true);
         setCurrentLine([x, y]);
@@ -490,14 +583,6 @@ const App = () => {
       default:
         break;
     }
-  };
-
-  const handleTextChange = (id, newText) => {
-    setShapes((prevShapes) =>
-      prevShapes.map((shape) =>
-        shape.id === id ? { ...shape, text: newText } : shape
-      )
-    );
   };
 
   const renderSelectionBox = () => {
@@ -859,6 +944,12 @@ const App = () => {
     }
   };
 
+  const handleStageDragStart = () => {
+    if (tool.type === "freehand") {
+      document.body.style.cursor = "grabbing";
+    }
+  };
+
   return (
     <>
       <div className="w-full flex items-center bg-black/50 overflow-hidden">
@@ -979,34 +1070,12 @@ const App = () => {
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onDragStart={handleStageDragStart}
           ref={stageRef}
           scaleX={scale}
           scaleY={scale}
           onClick={handleStageClick}
           draggable={tool.type == "freehand"}
-          onDragMove={(e) => {
-            const stage = e.target.getStage();
-            const pointerPosition = stage.getPointerPosition();
-            const pointerRelativePosition = stage.getRelativePointerPosition();
-            console.log(pointerPosition);
-            console.log(pointerRelativePosition);
-            const verticalShift = pointerPosition.y - pointerRelativePosition.y;
-            const horizontalShift =
-              pointerPosition.x - pointerRelativePosition.x;
-            setShapes((prevShapes) =>
-              prevShapes.map((shape) =>
-                shape.type === "textbox"
-                  ? {
-                      ...shape,
-                      horizontalShift:
-                        shape.horizontalShift - pointerRelativePosition.x,
-                      verticalShift:
-                        shape.verticalShift - pointerRelativePosition.y,
-                    }
-                  : shape
-              )
-            );
-          }}
         >
           <Layer>
             {shapes.map((shape, index) => {
@@ -1031,15 +1100,18 @@ const App = () => {
                       dragState.dragging && shape.id == dragState.id ? 6 : 0
                     }
                     scaleX={
-                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
+                      dragState.dragging && shape.id == dragState.id ? 1.02 : 1
                     }
                     scaleY={
-                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
+                      dragState.dragging && shape.id == dragState.id ? 1.02 : 1
                     }
                     draggable={tool.type === "freehand"}
                     onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
                     onDragEnd={handleDragEnd}
-                    onMouseEnter={handleMouseEnter}
+                    onMouseEnter={(e) => {
+                      handleMouseEnter(e);
+                    }}
                     onMouseLeave={handleMouseLeave}
                     onClick={(e) => {
                       handleShapeClick(e, shape);
@@ -1071,15 +1143,17 @@ const App = () => {
                       dragState.dragging && shape.id == dragState.id ? 6 : 0
                     }
                     scaleX={
-                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
+                      dragState.dragging && shape.id == dragState.id ? 1.02 : 1
                     }
                     scaleY={
-                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
+                      dragState.dragging && shape.id == dragState.id ? 1.02 : 1
                     }
                     draggable={tool.type === "freehand"}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
-                    onMouseEnter={handleMouseEnter}
+                    onMouseEnter={(e) => {
+                      handleMouseEnter(e);
+                    }}
                     onMouseLeave={handleMouseLeave}
                     onClick={(e) => {
                       handleShapeClick(e, shape);
@@ -1110,19 +1184,15 @@ const App = () => {
                     shadowOffsetY={
                       dragState.dragging && shape.id == dragState.id ? 6 : 0
                     }
-                    scaleX={
-                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
-                    }
-                    scaleY={
-                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
-                    }
                     draggable={tool.type === "freehand"}
                     onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
                     onDragEnd={handleDragEnd}
-                    onMouseEnter={handleMouseEnter}
+                    onMouseEnter={(e) => {
+                      handleMouseEnter(e);
+                    }}
                     onMouseLeave={handleMouseLeave}
                     onClick={(e) => {
-                      console.log(e.target.attrs.points);
                       handleShapeClick(e, shape);
                     }}
                   />
@@ -1151,19 +1221,15 @@ const App = () => {
                     shadowOffsetY={
                       dragState.dragging && shape.id == dragState.id ? 6 : 0
                     }
-                    scaleX={
-                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
-                    }
-                    scaleY={
-                      dragState.dragging && shape.id == dragState.id ? 1.05 : 1
-                    }
                     draggable={tool.type === "freehand"}
                     onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
                     onDragEnd={handleDragEnd}
-                    onMouseEnter={handleMouseEnter}
+                    onMouseEnter={(e) => {
+                      handleMouseEnter(e);
+                    }}
                     onMouseLeave={handleMouseLeave}
                     onClick={(e) => {
-                      console.log(e.target.attrs.points);
                       handleShapeClick(e, shape);
                     }}
                   />
@@ -1175,35 +1241,49 @@ const App = () => {
 
             {renderSelectionBox()}
           </Layer>
+          <Layer>
+            {shapes.map((shape, index) => {
+              if (shape.type === "textbox") {
+                return (
+                  <Text
+                    key={index}
+                    id={shape.id}
+                    name="textbox"
+                    text={
+                      selectedShape && selectedShape.id === shape.id
+                        ? shape.text + "|"
+                        : shape.text
+                    }
+                    fill={shape.color || "white"}
+                    fontSize={shape.fontSize}
+                    x={shape.x}
+                    y={shape.y}
+                    offsetX={
+                      selectedShape && selectedShape.id === shape.id ? 6 : 0
+                    }
+                    offsetY={
+                      selectedShape && selectedShape.id === shape.id ? 6 : 0
+                    }
+                    onClick={(e) => {
+                      handleShapeClick(e, shape);
+                    }}
+                    draggable={tool.type === "freehand"}
+                    wrap="char"
+                    ellipsis
+                    onDblClick={() => {}}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                    onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
+                    onDragEnd={handleDragEnd}
+                  />
+                );
+              }
+
+              return null;
+            })}
+          </Layer>
         </Stage>
-        {shapes.map((shape) => {
-          if (shape.type === "textbox") {
-            return (
-              <div
-                key={shape.id}
-                className="absolute"
-                style={{
-                  left: `${shape.x + shape.horizontalShift}px`,
-                  top: `${shape.y + shape.verticalShift}px`,
-                  fontFamily: shape.fontFamily,
-                  fontSize: `${shape.fontSize}px`,
-                  color: shape.color,
-                  width: "200px",
-                  height: "40px",
-                }}
-              >
-                <textarea
-                  placeholder="Type..."
-                  className="w-full h-full bg-transparent border-none resize"
-                  value={shape.text}
-                  onChange={(e) => handleTextChange(shape.id, e.target.value)}
-                  autoFocus
-                />
-              </div>
-            );
-          }
-          return null;
-        })}
       </div>
     </>
   );
