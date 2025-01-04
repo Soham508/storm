@@ -64,7 +64,7 @@ const App = () => {
       document.body.style.cursor = "grab";
     } else {
       document.body.style.cursor = "default";
-      setSelectedShape(undefined);
+      setSelectedShape(null);
     }
     return () => {
       document.body.style.cursor = "default";
@@ -122,6 +122,18 @@ const App = () => {
           return shape;
         })
       );
+    } else if (key === "Enter") {
+      setShapes((prevShapes) =>
+        prevShapes.map((shape) => {
+          if (shape.id === selectedShape.id) {
+            return {
+              ...shape,
+              text: shape.text + "\n",
+            };
+          }
+          return shape;
+        })
+      );
     } else if (e.shiftKey) {
       // Check if the key pressed is a letter (a-z or A-Z)
       if (
@@ -157,6 +169,7 @@ const App = () => {
   const handleStageClick = (e) => {
     const stage = e.target.getStage();
     const pointerPosition = stage.getPointerPosition();
+    const RelativePointerPosition = stage.getRelativePointerPosition();
 
     switch (tool.type) {
       case "freehand":
@@ -166,8 +179,8 @@ const App = () => {
       case "curve":
         setCurrentLine((prev) => [
           ...prev,
-          pointerPosition.x,
-          pointerPosition.y,
+          RelativePointerPosition.x,
+          RelativePointerPosition.y,
         ]);
         setTempData((prev) => ({
           ...prev,
@@ -201,6 +214,7 @@ const App = () => {
   };
 
   const handleShapeClick = (e, shape) => {
+    console.log(shape);
     if (tool.type === "freehand") {
       e.cancelBubble = true; // Prevent event from propagating to the Stage
       if (selectedShape && selectedShape.id === shape.id) {
@@ -227,6 +241,7 @@ const App = () => {
   };
 
   const handleDragEnd = (e) => {
+    console.log(stageRef);
     if (tool.type === "freehand") {
       document.body.style.cursor = "move";
     }
@@ -235,9 +250,20 @@ const App = () => {
     const { x, y } = e.target.position();
 
     if (e.target.name() === "line") {
-      const points = e.target.points();
+      const [x1, y1, x2, y2] = e.target.points();
+      const xDiff = e.target.x();
+      const yDiff = e.target.y();
+      console.log(x1 + xDiff, y1 + yDiff, x2 + xDiff, y2 + yDiff);
       setShapes((prev) =>
-        prev.map((shape) => (shape.id === id ? { ...shape, points } : shape))
+        prev.map((shape) =>
+          shape.id === id
+            ? {
+                ...shape,
+                points: e.target.points(),
+                newPoints: [x1 + xDiff, y1 + yDiff, x2 + xDiff, y2 + yDiff],
+              }
+            : shape
+        )
       );
     } else {
       setShapes((prev) =>
@@ -687,8 +713,7 @@ const App = () => {
   const renderSelectionBox = () => {
     if (!selectedShape) return null;
 
-    const { x, y, width, height, type, points, radiusX, radiusY } =
-      selectedShape;
+    const { x, y, width, height, type, radiusX, radiusY } = selectedShape;
 
     if (type === "rectangle") {
       const marginx = 5;
@@ -997,7 +1022,9 @@ const App = () => {
     }
 
     if (type === "line") {
-      const [x1, y1, x2, y2] = points;
+      const [x1, y1, x2, y2] = selectedShape.newPoints
+        ? selectedShape.newPoints
+        : selectedShape.points;
 
       return (
         <>
@@ -1007,7 +1034,7 @@ const App = () => {
             y={Math.min(y1, y2) - 10}
             width={Math.abs(x2 - x1) + 20}
             height={Math.abs(y2 - y1) + 20}
-            stroke="black"
+            stroke="red"
             strokeWidth={1}
             dash={[5, 5]}
           />
@@ -1208,11 +1235,6 @@ const App = () => {
           draggable={tool.type == "freehand"}
         >
           <Layer>
-            <Arrow
-              points={[100, 100, 200, 150, 300, 400]}
-              tension={0.5}
-              stroke="white"
-            />
             {shapes.map((shape, index) => {
               if (shape.type === "rectangle") {
                 return (
@@ -1380,9 +1402,10 @@ const App = () => {
                     points={shape.points}
                     stroke={shape.color || "white"}
                     strokeWidth={3}
-                    tension={0}
+                    tension={0.3}
                     closed={false}
-                    lineCap="butt"
+                    lineCap="round"
+                    lineJoin="round"
                     pointerAtBeginning={false}
                     pointerAtEnding={false}
                     shadowColor="white"
