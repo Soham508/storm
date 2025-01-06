@@ -195,8 +195,8 @@ const App = () => {
           const newShape = {
             id: nanoid(),
             type: "textbox",
-            x: pointerPosition.x,
-            y: pointerPosition.y,
+            x: RelativePointerPosition.x,
+            y: RelativePointerPosition.y,
             horizontalShift: 0,
             verticalShift: 0,
             fontFamily: "Arial",
@@ -716,7 +716,8 @@ const App = () => {
   const renderSelectionBox = () => {
     if (!selectedShape) return null;
 
-    const { x, y, width, height, type, radiusX, radiusY } = selectedShape;
+    const { x, y, width, height, type, radiusX, radiusY, rotation } =
+      selectedShape;
 
     if (type === "rectangle") {
       const marginx = 5;
