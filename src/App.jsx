@@ -1,6 +1,15 @@
 /* eslint-disable no-unused-vars */
 import { useEffect, useRef, useState } from "react";
-import { Stage, Layer, Rect, Arrow, Ellipse, Circle, Text } from "react-konva";
+import {
+  Stage,
+  Layer,
+  Rect,
+  Arrow,
+  Ellipse,
+  Circle,
+  Text,
+  Line,
+} from "react-konva";
 import { nanoid } from "nanoid";
 import { LiaHandPaperSolid } from "react-icons/lia";
 import { LuPenLine } from "react-icons/lu";
@@ -14,6 +23,7 @@ import { MdOutlineUndo } from "react-icons/md";
 import { FiZoomIn, FiZoomOut } from "react-icons/fi";
 import { FiMenu } from "react-icons/fi";
 import Menubar from "./components/Menubar";
+import Options from "./components/Options";
 
 const App = () => {
   const [shapes, setShapes] = useState([{}]);
@@ -23,7 +33,14 @@ const App = () => {
   const [scale, setScale] = useState(1);
   const [tool, setTool] = useState({
     type: "rectangle",
-    properties: { color: "white" },
+    properties: {
+      color: "white",
+      fill: "transparent",
+      strokeStyle: [0, 0],
+      strokeWidth: 2,
+      cornerRadius: 8,
+      opacity: 100,
+    },
   });
   const [menu, setMenu] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -70,7 +87,7 @@ const App = () => {
     return () => {
       document.body.style.cursor = "default";
     };
-  }, [tool]);
+  }, [tool.type]);
 
   const handleToolKeyDown = (e) => {
     if (e.ctrlKey && e.key === "f") {
@@ -107,6 +124,7 @@ const App = () => {
       setSelectedShape(null);
     }
   };
+
   const handleKeyDownText = (e) => {
     if (!selectedShape) return;
 
@@ -195,8 +213,8 @@ const App = () => {
           const newShape = {
             id: nanoid(),
             type: "textbox",
-            x: pointerPosition.x,
-            y: pointerPosition.y,
+            x: RelativePointerPosition.x,
+            y: RelativePointerPosition.y,
             horizontalShift: 0,
             verticalShift: 0,
             fontFamily: "Arial",
@@ -309,12 +327,13 @@ const App = () => {
         setCurrentLine([x, y]);
         break;
 
-      //case "curve":
-      //  if (currentLine.length === 0) {
-      //    setCurrentLine([x, y]);
-      //    setTempData({ curvePoints: 1 });
-      //  }
-      //  break;
+      case "rectangle":
+        setStartPosition({ startX: x, startY: y });
+        break;
+
+      case "ellipse":
+        setStartPosition({ startX: x, startY: y });
+        break;
 
       default:
         setStartPosition({ startX: x, startY: y });
@@ -1241,6 +1260,11 @@ const App = () => {
       document.body.style.cursor = "grabbing";
     }
   };
+  const handleStageDragEnd = () => {
+    if (tool.type === "freehand") {
+      document.body.style.cursor = "grab";
+    }
+  };
 
   return (
     <>
@@ -1257,13 +1281,13 @@ const App = () => {
             <Menubar stageRef={stageRef} />
           </>
         )}
+        {tool.type != "freehand" && (
+          <>
+            <Options tool={tool} setTool={setTool} />
+          </>
+        )}
 
-        <div
-          className="flex flex-col w-16 items-center rounded-lg bg-[#232329] gap-2 pt-2 pb-2 z-40 absolute top-50 left-3"
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-        >
+        <div className="flex flex-row items-center h-14 rounded-lg bg-[#232329] gap-2 pt-2 pb-2 z-40 absolute top-4 left-[40%]">
           <button
             className={`bg-transparent flex items-center hover:bg-zinc-900  ${
               tool.type == "freehand"
@@ -1271,7 +1295,17 @@ const App = () => {
                 : ""
             } cursor-pointer h-12 w-14 `}
             onClick={() => {
-              setTool({ type: "freehand" });
+              setTool({
+                type: "freehand",
+                properties: {
+                  color: "#cbd5e1",
+                  fill: "transparent",
+                  strokeStyle: [0, 0],
+                  strokeWidth: 2,
+                  cornerRadius: 0,
+                  opacity: 100,
+                },
+              });
             }}
           >
             <LiaHandPaperSolid size={24} />
@@ -1282,9 +1316,19 @@ const App = () => {
                 ? "bg-zinc-700 border-1 border-zinc-400 "
                 : ""
             } cursor-pointer h-12 w-14 `}
-            onClick={() =>
-              setTool({ type: "rectangle", properties: { color: "red" } })
-            }
+            onClick={(e) => {
+              setTool({
+                type: "rectangle",
+                properties: {
+                  color: "#cbd5e1",
+                  fill: "transparent",
+                  strokeStyle: [0, 0],
+                  strokeWidth: 2,
+                  cornerRadius: 0,
+                  opacity: 100,
+                },
+              });
+            }}
           >
             <BiRectangle size={24} />
           </button>
@@ -1294,9 +1338,20 @@ const App = () => {
                 ? "bg-zinc-700 border-1 border-zinc-400 "
                 : ""
             } cursor-pointer h-12 w-14 `}
-            onClick={() =>
-              setTool({ type: "ellipse", properties: { color: "red" } })
-            }
+            onClick={(e) => {
+              e.stopPropagation();
+              setTool({
+                type: "ellipse",
+                properties: {
+                  color: "#cbd5e1",
+                  fill: "transparent",
+                  strokeStyle: [0, 0],
+                  strokeWidth: 2,
+                  cornerRadius: 0,
+                  opacity: 100,
+                },
+              });
+            }}
           >
             <MdOutlineCircle size={24} />
           </button>
@@ -1307,7 +1362,17 @@ const App = () => {
                 : ""
             } cursor-pointer h-12 w-14 `}
             onClick={() =>
-              setTool({ type: "arrow", properties: { color: "white" } })
+              setTool({
+                type: "arrow",
+                properties: {
+                  color: "#cbd5e1",
+                  fill: "transparent",
+                  strokeStyle: [0, 0],
+                  strokeWidth: 2,
+                  cornerRadius: 0,
+                  opacity: 100,
+                },
+              })
             }
           >
             <HiOutlineArrowLongRight size={24} />
@@ -1317,7 +1382,17 @@ const App = () => {
               tool.type == "line" ? "bg-zinc-700 border-1 border-zinc-400 " : ""
             } cursor-pointer h-12 w-14 `}
             onClick={() =>
-              setTool({ type: "line", properties: { color: "white" } })
+              setTool({
+                type: "line",
+                properties: {
+                  color: "#cbd5e1",
+                  fill: "transparent",
+                  strokeStyle: [0, 0],
+                  strokeWidth: 2,
+                  cornerRadius: 0,
+                  opacity: 100,
+                },
+              })
             }
           >
             <TfiLayoutLineSolid size={24} />
@@ -1329,7 +1404,18 @@ const App = () => {
                 : ""
             } cursor-pointer h-12 w-14 `}
             onClick={() =>
-              setTool({ type: "curve", properties: { color: "white" } })
+              setTool({
+                type: "curve",
+                properties: {
+                  color: "#cbd5e1",
+                  fill: "transparent",
+                  strokeStyle: [0, 0],
+                  strokeWidth: 2,
+                  cornerRadius: 0,
+                  opacity: 100,
+                  tension: 0,
+                },
+              })
             }
           >
             <TbArrowCurveLeft size={24} />
@@ -1341,7 +1427,17 @@ const App = () => {
                 : ""
             } cursor-pointer h-12 w-14 `}
             onClick={() =>
-              setTool({ type: "textbox", properties: { color: "white" } })
+              setTool({
+                type: "textbox",
+                properties: {
+                  color: "#cbd5e1",
+                  fill: "transparent",
+                  strokeStyle: [0, 0],
+                  strokeWidth: 2,
+                  cornerRadius: 0,
+                  opacity: 100,
+                },
+              })
             }
           >
             <CiText size={24} />
@@ -1353,14 +1449,24 @@ const App = () => {
                 : ""
             } cursor-pointer h-12 w-14 `}
             onClick={() =>
-              setTool({ type: "drawing", properties: { color: "white" } })
+              setTool({
+                type: "drawing",
+                properties: {
+                  color: "#cbd5e1",
+                  fill: "transparent",
+                  strokeStyle: [0, 0],
+                  strokeWidth: 2,
+                  cornerRadius: 0,
+                  opacity: 100,
+                },
+              })
             }
           >
             <LuPenLine size={24} />
           </button>
         </div>
 
-        <div className="absolute left-[50%] gap-0 flex cursor-pointer top-4 z-50">
+        <div className="absolute left-[44%] gap-0 flex cursor-pointer bottom-4 z-50">
           <button onClick={handleUndo} className="rounded-r-[0]">
             <MdOutlineUndo />
           </button>
@@ -1368,7 +1474,7 @@ const App = () => {
             <MdOutlineRedo />
           </button>
         </div>
-        <div className="absolute h-10 left-[50%] gap-0 flex cursor-pointer bottom-4 z-50">
+        <div className="absolute h-10 left-[52%] gap-0 flex cursor-pointer bottom-4 z-50">
           <button
             onClick={() => setScale((prev) => prev + 0.05)}
             className="rounded-r-[0]"
@@ -1392,8 +1498,12 @@ const App = () => {
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onTouchStart={handleMouseDown}
+          onTouchMove={handleMouseMove}
+          onTouchEnd={handleMouseUp}
           onDblClick={handleDblClick}
           onDragStart={handleStageDragStart}
+          onDragEnd={handleStageDragEnd}
           ref={stageRef}
           scaleX={scale}
           scaleY={scale}
@@ -1410,17 +1520,23 @@ const App = () => {
                     name="rectangle"
                     x={shape.x}
                     y={shape.y}
+                    fill={shape.fill}
                     width={shape.width}
                     height={shape.height}
+                    dash={shape.strokeStyle || [0, 0]}
+                    cornerRadius={shape.cornerRadius || 0}
+                    strokeWidth={shape.strokeWidth || 2}
                     stroke={shape.color || "white"}
                     shadowColor="white"
-                    shadowBlur={15}
+                    shadowBlur={10}
+                    shadowEnabled={false}
                     shadowOpacity={0.9}
+                    opacity={shape.opacity / 100 || 1}
                     shadowOffsetX={
-                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                      dragState.dragging && shape.id == dragState.id ? 3 : 0
                     }
                     shadowOffsetY={
-                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                      dragState.dragging && shape.id == dragState.id ? 3 : 0
                     }
                     scaleX={
                       dragState.dragging && shape.id == dragState.id ? 1.02 : 1
@@ -1454,16 +1570,20 @@ const App = () => {
                     fillPatternOffset={[100, 200]}
                     radiusX={shape.radiusX}
                     radiusY={shape.radiusY}
-                    strokeWidth={2}
+                    dash={shape.strokeStyle || [0, 0]}
                     stroke={shape.color || "white"}
+                    strokeWidth={shape.strokeWidth || 2}
+                    fill={shape.fill}
                     shadowColor="white"
                     shadowBlur={15}
                     shadowOpacity={0.9}
+                    shadowEnabled={false}
+                    opacity={shape.opacity / 100 || 1}
                     shadowOffsetX={
-                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                      dragState.dragging && shape.id == dragState.id ? 3 : 0
                     }
                     shadowOffsetY={
-                      dragState.dragging && shape.id == dragState.id ? 6 : 0
+                      dragState.dragging && shape.id == dragState.id ? 3 : 0
                     }
                     scaleX={
                       dragState.dragging && shape.id == dragState.id ? 1.02 : 1
@@ -1493,7 +1613,8 @@ const App = () => {
                     name="line"
                     points={shape.points}
                     stroke={shape.color || "white"}
-                    strokeWidth={3}
+                    strokeWidth={shape.strokeWidth || 2}
+                    dash={shape.strokeStyle || [0, 0]}
                     tension={0.5}
                     lineCap="round"
                     pointerAtBeginning={false}
@@ -1501,6 +1622,8 @@ const App = () => {
                     shadowColor="white"
                     shadowBlur={15}
                     shadowOpacity={0.9}
+                    shadowEnabled={false}
+                    opacity={shape.opacity / 100 || 1}
                     shadowOffsetX={
                       dragState.dragging && shape.id == dragState.id ? 6 : 0
                     }
@@ -1530,7 +1653,8 @@ const App = () => {
                     name="arrow"
                     points={shape.points}
                     stroke={shape.color || "white"}
-                    strokeWidth={3}
+                    strokeWidth={shape.strokeWidth || 2}
+                    dash={shape.strokeStyle || [0, 0]}
                     tension={0.5}
                     lineCap="round"
                     pointerAtBeginning={false}
@@ -1538,6 +1662,8 @@ const App = () => {
                     shadowColor="white"
                     shadowBlur={15}
                     shadowOpacity={0.9}
+                    shadowEnabled={false}
+                    opacity={shape.opacity / 100 || 1}
                     shadowOffsetX={
                       dragState.dragging && shape.id == dragState.id ? 6 : 0
                     }
@@ -1561,22 +1687,24 @@ const App = () => {
 
               if (shape.type === "curve") {
                 return (
-                  <Arrow
+                  <Line
                     key={index}
                     id={shape.id}
                     name="curve"
                     points={shape.points}
                     stroke={shape.color || "white"}
-                    strokeWidth={3}
-                    tension={0.3}
-                    closed={false}
+                    strokeWidth={shape.strokeWidth || 2}
+                    dash={shape.strokeStyle || [0, 0]}
+                    tension={shape.tension || 0}
                     lineCap="round"
                     lineJoin="round"
                     pointerAtBeginning={false}
-                    pointerAtEnding={false}
+                    pointerAtEnding={shape.pointerAtEnding || false}
                     shadowColor="white"
                     shadowBlur={15}
                     shadowOpacity={0.9}
+                    shadowEnabled={false}
+                    opacity={shape.opacity / 100 || 1}
                     shadowOffsetX={
                       dragState.dragging && shape.id == dragState.id ? 6 : 0
                     }
@@ -1631,6 +1759,7 @@ const App = () => {
                     }}
                     draggable={tool.type === "freehand"}
                     wrap="char"
+                    opacity={shape.opacity / 100 || 0.5}
                     ellipsis
                     onDblClick={() => {}}
                     onMouseEnter={handleMouseEnter}
