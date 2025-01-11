@@ -294,7 +294,7 @@ const Options = ({ tool, setTool }) => {
         </div>
       </div>
 
-      {["rectangle", "textbox"].includes(tool.type) && (
+      {["rectangle"].includes(tool.type) && (
         <div className="bg-transparent w-full flex flex-col items-start justify-start gap-1">
           <span className="text-center text-sm text-white ml-0 font-semibold ">
             Corner Sharpness
@@ -433,6 +433,33 @@ const Options = ({ tool, setTool }) => {
         //  </div>
         //</div>
       }
+      {tool.type === "textbox" && (
+        <div className="bg-transparent w-full flex flex-col items-start justify-start gap-1">
+          <span className="text-center text-sm text-white ml-0 font-semibold ">
+            Font Size
+          </span>
+          <div className="flex flex-row w-full items-center justify-start gap-2">
+            <input
+              type="range"
+              min="16"
+              max="56"
+              value={tool.properties.fontSize}
+              onChange={(e) => {
+                setTool((prev) => ({
+                  type: prev.type,
+                  properties: { ...prev.properties, fontSize: e.target.value },
+                }));
+              }}
+              className="w-4/5 h-3 bg-gray-200 rounded-lg"
+            />
+            <div className="flex w-1/5 items-center justify-center">
+              <span className="text-xs text-white">
+                {tool.properties.fontSize}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-transparent w-full flex flex-col items-start justify-start gap-1">
         <span className="text-center text-sm text-white ml-0 font-semibold ">
@@ -452,9 +479,9 @@ const Options = ({ tool, setTool }) => {
               }));
               console.log(tool);
             }}
-            className="w-full h-3 bg-gray-200 rounded-lg"
+            className="w-4/5 h-3 bg-gray-200 rounded-lg"
           />
-          <div className="flex items-center justify-center">
+          <div className="flex w-1/5 items-center justify-center">
             <span className="text-xs text-white">{opacity}%</span>
           </div>
         </div>

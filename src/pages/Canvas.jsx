@@ -24,6 +24,7 @@ import { FiZoomIn, FiZoomOut } from "react-icons/fi";
 import { FiMenu } from "react-icons/fi";
 import Menubar from "./../components/Menubar";
 import Options from "./../components/Options";
+import renderSelectionBox from "../utils/selectionBox";
 
 const Canvas = () => {
   const [shapes, setShapes] = useState([{}]);
@@ -79,6 +80,7 @@ const Canvas = () => {
     console.log(stageRef.current);
     setTempData({});
     setCurrentLine([]);
+    setMenu(false);
     setSelectedShape(null);
     if (tool.type === "freehand") {
       document.body.style.cursor = "grab";
@@ -216,10 +218,6 @@ const Canvas = () => {
             type: "textbox",
             x: RelativePointerPosition.x,
             y: RelativePointerPosition.y,
-            horizontalShift: 0,
-            verticalShift: 0,
-            fontFamily: "Arial",
-            fontSize: 24,
             ...tool.properties,
             text: "Type",
           };
@@ -282,9 +280,6 @@ const Canvas = () => {
             ? {
                 ...shape,
                 points: [x1 + xDiff, y1 + yDiff, x2 + xDiff, y2 + yDiff],
-                newPoints: [x1 + xDiff, y1 + yDiff, x2 + xDiff, y2 + yDiff],
-                xDiff,
-                yDiff,
               }
             : shape
         )
@@ -737,7 +732,7 @@ const Canvas = () => {
 
   //--------------Render selection shape---------------//
 
-  const renderSelectionBox = () => {
+  const renderSelectionBoxes = () => {
     if (!selectedShape) return null;
 
     const { x, y, width, height, type, radiusX, radiusY, rotation } =
@@ -1074,11 +1069,7 @@ const Canvas = () => {
             draggable
             onDragMove={(e) => {
               console.log(stageRef);
-              const xDiff = selectedShape.xDiff ? selectedShape.xDiff : 0;
-              const yDiff = selectedShape.yDiff ? selectedShape.yDiff : 0;
-              const [x1, y1, x2, y2] = selectedShape.newPoints
-                ? selectedShape.newPoints
-                : selectedShape.points;
+              const [x1, y1, x2, y2] = selectedShape.points;
               //console.log(
               //  e.target._lastPos,
               //  e.target.x(),
@@ -1097,7 +1088,6 @@ const Canvas = () => {
                           shape.points[2],
                           shape.points[3],
                         ],
-                        newPoints: [e.target.x(), e.target.y(), x2, y2],
                       }
                     : shape
                 )
@@ -1110,7 +1100,6 @@ const Canvas = () => {
                   prev.points[2],
                   prev.points[3],
                 ],
-                newPoints: [e.target.x(), e.target.y(), x2, y2],
               }));
             }}
           />
@@ -1121,11 +1110,7 @@ const Canvas = () => {
             fill="red"
             draggable
             onDragMove={(e) => {
-              const xDiff = selectedShape.xDiff ? selectedShape.xDiff : 0;
-              const yDiff = selectedShape.yDiff ? selectedShape.yDiff : 0;
-              const [x1, y1, x2, y2] = selectedShape.newPoints
-                ? selectedShape.newPoints
-                : selectedShape.points;
+              const [x1, y1, x2, y2] = selectedShape.points;
               //console.log(
               //  e.target._lastPos,
               //  e.target.x(),
@@ -1144,7 +1129,6 @@ const Canvas = () => {
                           e.target.x(),
                           e.target.y(),
                         ],
-                        newPoints: [x1, y1, e.target.x(), e.target.y()],
                       }
                     : shape
                 )
@@ -1157,7 +1141,6 @@ const Canvas = () => {
                   e.target.x(),
                   e.target.y(),
                 ],
-                newPoints: [x1, y1, e.target.x(), e.target.y()],
               }));
             }}
           />
@@ -1189,11 +1172,7 @@ const Canvas = () => {
             stroke="red"
             draggable
             onDragMove={(e) => {
-              const xDiff = selectedShape.xDiff ? selectedShape.xDiff : 0;
-              const yDiff = selectedShape.yDiff ? selectedShape.yDiff : 0;
-              const [x1, y1, x2, y2] = selectedShape.newPoints
-                ? selectedShape.newPoints
-                : selectedShape.points;
+              const [x1, y1, x2, y2] = selectedShape.points;
               //console.log(
               //  e.target._lastPos,
               //  e.target.x(),
@@ -1212,7 +1191,6 @@ const Canvas = () => {
                           shape.points[2],
                           shape.points[3],
                         ],
-                        newPoints: [e.target.x(), e.target.y(), x2, y2],
                       }
                     : shape
                 )
@@ -1225,7 +1203,6 @@ const Canvas = () => {
                   prev.points[2],
                   prev.points[3],
                 ],
-                newPoints: [e.target.x(), e.target.y(), x2, y2],
               }));
             }}
           />
@@ -1281,7 +1258,11 @@ const Canvas = () => {
 
         {menu && (
           <>
-            <Menubar stageRef={stageRef} />
+            <Menubar
+              stageRef={stageRef}
+              shapes={shapes}
+              setShapes={setShapes}
+            />
           </>
         )}
         {tool.type != "freehand" && (
@@ -1439,6 +1420,7 @@ const Canvas = () => {
                   strokeWidth: 2,
                   cornerRadius: 0,
                   opacity: 100,
+                  fontSize: 22,
                 },
               })
             }
@@ -1732,7 +1714,12 @@ const Canvas = () => {
               return null;
             })}
 
-            {renderSelectionBox()}
+            {renderSelectionBox({
+              selectedShape,
+              setSelectedShape,
+              setShapes,
+              stageRef,
+            })}
           </Layer>
           <Layer>
             {shapes.map((shape, index) => {
@@ -1748,9 +1735,10 @@ const Canvas = () => {
                         : shape.text
                     }
                     stroke={shape.fill || "white"}
+                    strokeWidth={shape.strokeWidth}
                     fill={shape.color || "transparent"}
                     fillAfterStrokeEnabled
-                    fontSize={shape.fontSize}
+                    fontSize={shape.fontSize || 24}
                     x={shape.x}
                     y={shape.y}
                     offsetX={
