@@ -13,6 +13,7 @@ import {
 import { nanoid } from "nanoid";
 import { LiaHandPaperSolid } from "react-icons/lia";
 import { LuPenLine } from "react-icons/lu";
+import { IoShareSocialOutline } from "react-icons/io5";
 import { TfiLayoutLineSolid } from "react-icons/tfi";
 import { HiOutlineArrowLongRight } from "react-icons/hi2";
 import { TbArrowCurveLeft } from "react-icons/tb";
@@ -25,6 +26,7 @@ import { FiMenu } from "react-icons/fi";
 import Menubar from "./../components/Menubar";
 import Options from "./../components/Options";
 import renderSelectionBox from "../utils/selectionBox";
+import Share from "../components/Share";
 
 const Canvas = () => {
   const [shapes, setShapes] = useState([{}]);
@@ -44,6 +46,7 @@ const Canvas = () => {
     },
   });
   const [menu, setMenu] = useState(false);
+  const [share, setShare] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedShape, setSelectedShape] = useState(undefined);
   const [currentLine, setCurrentLine] = useState([]);
@@ -707,6 +710,7 @@ const Canvas = () => {
 
     switch (tool.type) {
       case "curve":
+        console.log(tool.properties);
         if (shapes[shapes.length - 1].MouseMove) {
           setShapes((prevShapes) => [
             ...prevShapes.slice(0, prevShapes.length - 1),
@@ -1256,6 +1260,16 @@ const Canvas = () => {
           <FiMenu size={20} />
         </button>
 
+        <button
+          className="absolute h-12 p-2 gap-1 top-4 right-20 flex items-center justify-center cursor-pointer z-50"
+          onClick={() => setShare((prev) => !prev)}
+        >
+          <span className=""> Share</span>
+          <IoShareSocialOutline color="" className="mt-0.5" size={20} />
+        </button>
+
+        {<Share share={share} />}
+
         {menu && (
           <>
             <Menubar
@@ -1538,6 +1552,7 @@ const Canvas = () => {
                     }}
                     onMouseLeave={handleMouseLeave}
                     onClick={(e) => {
+                      console.log("clicked");
                       handleShapeClick(e, shape);
                     }}
                   />
@@ -1672,7 +1687,7 @@ const Canvas = () => {
 
               if (shape.type === "curve") {
                 return (
-                  <Line
+                  <Arrow
                     key={index}
                     id={shape.id}
                     name="curve"
@@ -1683,8 +1698,8 @@ const Canvas = () => {
                     tension={shape.tension || 0}
                     lineCap="round"
                     lineJoin="round"
-                    pointerAtBeginning={false}
-                    pointerAtEnding={shape.pointerAtEnding || false}
+                    pointerAtBeginning={shape.pointerAtBeginning ? true : false}
+                    pointerAtEnding={shape.pointerAtEnding ? true : false}
                     shadowColor="white"
                     shadowBlur={15}
                     shadowOpacity={0.9}

@@ -3,6 +3,9 @@ import { RxTransparencyGrid } from "react-icons/rx";
 import { GoDash } from "react-icons/go";
 import { AiOutlineDash } from "react-icons/ai";
 import { AiOutlineSmallDash } from "react-icons/ai";
+import { GoArrowRight } from "react-icons/go";
+import { BsArrows } from "react-icons/bs";
+import { TfiLayoutLineSolid } from "react-icons/tfi";
 import {
   TbBorderCornerSquare,
   TbBorderCornerRounded,
@@ -228,7 +231,7 @@ const Options = ({ tool, setTool }) => {
 
       <div className="bg-transparent w-full flex flex-col items-start justify-start gap-1">
         <span className="text-center text-sm text-white ml-0 font-semibold ">
-          Stroke Style
+          Stroke Width
         </span>
         <div className="flex flex-row w-full items-center justify-start gap-1">
           <button
@@ -411,6 +414,82 @@ const Options = ({ tool, setTool }) => {
               }}
             >
               <TbBorderCornerPill />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tool.type === "curve" && (
+        <div className="bg-transparent w-full flex flex-col items-start justify-start gap-1">
+          <span className="text-center text-sm text-white ml-0 font-semibold ">
+            Arrow Style
+          </span>
+          <div className="flex flex-row w-full items-center justify-start gap-1">
+            <button
+              className={`h-8 w-8 flex items-center justify-center hover:bg-zinc-900  rounded-lg p-0.5
+                ${
+                  !tool.properties.pointerAtBeginning &&
+                  !tool.properties.pointerAtEnding
+                    ? "bg-slate-600 "
+                    : "bg-zinc-700 "
+                }
+                `}
+              onClick={() => {
+                setTool((prev) => ({
+                  type: prev.type,
+                  properties: {
+                    ...prev.properties,
+                    pointerAtEnding: false,
+                    pointerAtBeginning: false,
+                  },
+                }));
+              }}
+            >
+              <TfiLayoutLineSolid />
+            </button>
+            <button
+              className={`h-8 w-8 flex items-center justify-center hover:bg-zinc-900  rounded-lg p-0.5
+                ${
+                  tool.properties.pointerAtEnding &&
+                  !tool.properties.pointerAtBeginning
+                    ? "bg-slate-600 "
+                    : "bg-zinc-700 "
+                }
+                `}
+              onClick={() => {
+                setTool((prev) => ({
+                  type: prev.type,
+                  properties: {
+                    ...prev.properties,
+                    pointerAtEnding: true,
+                    pointerAtBeginning: false,
+                  },
+                }));
+              }}
+            >
+              <GoArrowRight />
+            </button>
+            <button
+              className={`h-8 w-8 flex items-center justify-center  hover:bg-zinc-900  rounded-lg p-0.5
+                ${
+                  tool.properties.pointerAtBeginning &&
+                  tool.properties.pointerAtEnding
+                    ? "bg-slate-600 "
+                    : "bg-zinc-700 "
+                }
+                `}
+              onClick={() => {
+                setTool((prev) => ({
+                  type: prev.type,
+                  properties: {
+                    ...prev.properties,
+                    pointerAtEnding: true,
+                    pointerAtBeginning: true,
+                  },
+                }));
+              }}
+            >
+              <BsArrows />
             </button>
           </div>
         </div>
